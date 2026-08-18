@@ -16,7 +16,7 @@ def conectar_gsheets():
     credenciales_dict = json.loads(st.secrets["gcp_service_account"])
     creds = ServiceAccountCredentials.from_json_keyfile_dict(credenciales_dict, scope)
     cliente = gspread.authorize(creds)
-    return cliente.open("Rebuilt_Health_Data")
+    return cliente.open_by_url("https://docs.google.com/spreadsheets/d/1qh9cq3nPmYEtnQ_QQGXC1F4Ik0UQKI0eI4WeAGmrZ_c/edit?gid=0#gid=0")
 
 # Inicializar la conexión a las pestañas
 hoja_principal = conectar_gsheets()
