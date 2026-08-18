@@ -110,13 +110,40 @@ if not st.session_state['logged_in']:
         with col3:
             new_edad = st.number_input("Edad", min_value=15, max_value=100, step=1, key="reg_edad")
             
+        # Bloque de Disclaimer y Consentimiento
+        st.markdown("---")
+        
+        with st.expander("📄 Leer Consentimiento Informado y Términos de Uso completos"):
+            st.markdown("""
+            **1. Naturaleza de los Datos:**
+            Los datos recopilados incluyen edad, sexo biológico, medidas antropométricas y registros diarios de ingesta y gasto calórico.
+            
+            **2. Uso para Investigación Científica:**
+            Al utilizar esta plataforma, autorizas que tu información sea almacenada y utilizada de forma estrictamente anonimizada para investigaciones, publicaciones científicas y análisis estadísticos en el área de la salud.
+            
+            **3. Privacidad y Seguridad:**
+            Tus datos de identidad directa (como tu nombre) no serán vinculados a tus métricas corporales en ninguna publicación o base de datos externa. La información se aloja en servidores seguros en la nube con acceso restringido.
+            
+            **4. Derecho a Revocación (Retiro):**
+            El registro de datos es voluntario. Tienes el derecho de solicitar la eliminación total de tu información de nuestro repositorio investigativo en cualquier momento, sin necesidad de justificación y sin que esto afecte el uso futuro de la aplicación.
+            
+            **5. Responsabilidad y Contacto:**
+            Esta plataforma es una herramienta de cuantificación y no sustituye la evaluación médica profesional. Para consultas sobre la privacidad de tu información o para ejercer tu derecho a eliminar tus datos del estudio, contáctanos a través de nuestro Instagram oficial: **@re_built_health**.
+            """)
+
+        st.markdown("**Consentimiento**")
+        consentimiento = st.checkbox("He leído y acepto el consentimiento informado para el uso de datos en investigación.", key="reg_consent")
+        st.markdown("---")
+            
         if st.button("Crear Cuenta"):
-            if register_user(new_username, new_password, new_nombre, new_sexo, new_estatura, new_edad):
-                st.success("Cuenta creada exitosamente. Inicia sesión en el menú lateral.")
-                # Guarda el usuario registrado para inyectarlo en el login
-                st.session_state['last_registered_user'] = new_username
+            if not consentimiento:
+                st.warning("Debes aceptar el consentimiento informado para crear una cuenta.")
             else:
-                st.error("Este nombre de usuario ya está en uso.")
+                if register_user(new_username, new_password, new_nombre, new_sexo, new_estatura, new_edad):
+                    st.success("Cuenta creada exitosamente. Selecciona 'Iniciar Sesión' en el menú lateral.")
+                    st.session_state['last_registered_user'] = new_username
+                else:
+                    st.error("Este nombre de usuario ya está en uso.")
 
 else:
     # --- DASHBOARD PRINCIPAL (Usuario Logueado) ---
