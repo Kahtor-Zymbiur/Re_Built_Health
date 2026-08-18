@@ -28,25 +28,29 @@ def hash_password(password):
     return hashlib.sha256(str.encode(password)).hexdigest()
 
 def verify_login(username, password):
-    conn = sqlite3.connect('rebuilt_health.db')
-    c = conn.cursor()
-    c.execute('SELECT * FROM users WHERE username=? AND password=?', (username, hash_password(password)))
-    user = c.fetchone()
-    conn.close()
-    return user
+    hashed_pw = hash_password(password)
+    # Extraer todos los registros de la pestaña Usuarios
+    usuarios = pestaña_usuarios.get_all_records()
+    
+    # Buscar coincidencia de credenciales
+    for user in usuarios:
+        if str(user['username']) == username and str(user['password']) == hashed_pw:
+            # Retornar tupla exacta como lo hacía SQLite para no romper el resto de tu código
+            return (user['username'], user['password'], user['nombre'], user['sexo'], user['estatura'], user['edad'])
+    return None
 
 def register_user(username, password, nombre, sexo, estatura, edad):
-    conn = sqlite3.connect('rebuilt_health.db')
-    c = conn.cursor()
-    try:
-        c.execute('INSERT INTO users (username, password, nombre, sexo, estatura, edad) VALUES (?, ?, ?, ?, ?, ?)',
-                  (username, hash_password(password), nombre, sexo, estatura, edad))
-        conn.commit()
-        conn.close()
-        return True
-    except sqlite3.IntegrityError:
-        conn.close()
-        return False # El nombre de usuario ya existe
+    # Obtener toda la columna de nombres de usuario para verificar si ya existe
+    usuarios_existentes = pestaña_usuarios.col_values(1)
+    
+    if username in usuarios_existentes:
+        return False # Falla el registro porque el usuario ya existe
+        
+    # Si el usuario es nuevo, encriptar clave y agregar fila
+    hashed_pw = hash_password(password)
+    nueva_fila = [username, hashed_pw, nombre, sexo, float(estatura), int(edad)]
+    pestaña_usuarios.append_row(nueva_fila)
+    return True
 
 # --- 3. MOTORES DE CÁLCULO CLÍNICO ---
 def calcular_grasa_naval(sexo, estatura, cuello, cintura, cadera=0):
@@ -66,8 +70,6 @@ def calcular_katch_mcardle(peso, porcentaje_grasa):
 
 # --- 4. INTERFAZ DE USUARIO (UI) ---
 st.set_page_config(page_title="Re/Built Health", layout="centered")
-
-init_db()
 
 # Control de Sesión
 if 'logged_in' not in st.session_state:
@@ -185,25 +187,33 @@ else:
         tdee = tmb + activas
         balance = ingesta - tdee
         
-        # Guardar en base de datos (Lógica Upsert: Previene duplicados)
-        conn = sqlite3.connect('rebuilt_health.db')
-        c = conn.cursor()
+        # --- Guardar en base de datos (Lógica Upsert: Previene duplicados) ---
         fecha_hoy = str(datetime.now().date())
+        username_actual = st.session_state['username']
         
-        c.execute('SELECT * FROM daily_logs WHERE username=? AND fecha=?', (st.session_state['username'], fecha_hoy))
-        registro_existente = c.fetchone()
+        # Obtener todos los registros para buscar si ya existe uno hoy
+        registros_existentes = pestaña_registros.get_all_records()
         
-        if registro_existente:
-            c.execute('''UPDATE daily_logs 
-                         SET peso=?, cuello=?, cintura=?, cadera=?, ingesta_kcal=?, calorias_activas=?
-                         WHERE username=? AND fecha=?''',
-                      (peso, cuello, cintura, cadera, ingesta, activas, st.session_state['username'], fecha_hoy))
+        fila_a_actualizar = None
+        # get_all_records devuelve una lista de diccionarios. 
+        # La fila en Sheets empieza en 2 (ya que la 1 es el encabezado).
+        for i, registro in enumerate(registros_existentes):
+            if str(registro['username']) == username_actual and str(registro['fecha']) == fecha_hoy:
+                fila_a_actualizar = i + 2
+                break
+                
+        # Preparar los datos a guardar respetando las 9 columnas de la hoja de Google
+        # Nota: Como en tu SQLite no guardabas el porcentaje de grasa, aquí lo pasamos como string vacío ("").
+        # Si tienes la variable calculada en tu código (ej. bf_navy), reemplaza ese "" por tu variable.
+        nueva_fila = [username_actual, fecha_hoy, peso, "", cuello, cintura, cadera, ingesta, activas]
+        
+        if fila_a_actualizar:
+            # Actualizar la fila existente indicando el rango exacto (de la columna A a la I)
+            rango = f"A{fila_a_actualizar}:I{fila_a_actualizar}"
+            pestaña_registros.update(values=[nueva_fila], range_name=rango)
         else:
-            c.execute('INSERT INTO daily_logs VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-                      (st.session_state['username'], fecha_hoy, peso, cuello, cintura, cadera, ingesta, activas))
-                      
-        conn.commit()
-        conn.close()
+            # Insertar como una fila nueva al final del documento
+            pestaña_registros.append_row(nueva_fila)
         
         # Mostrar métricas
         st.markdown("### Resultados Metabólicos del Día")
@@ -221,18 +231,36 @@ else:
     st.markdown("---")
     st.subheader("Auditoría Histórica")
     
-    conn_hist = sqlite3.connect('rebuilt_health.db')
-    query = '''
-        SELECT fecha AS Fecha, peso AS Peso_kg, cuello AS Cuello_cm, cintura AS Cintura_cm, cadera AS Cadera_cm,
-               ingesta_kcal AS Ingesta, calorias_activas AS Gasto_Activo 
-        FROM daily_logs 
-        WHERE username=? 
-        ORDER BY fecha ASC
-    '''
-    df_historial = pd.read_sql_query(query, conn_hist, params=(st.session_state.get('username', ''),))
-    conn_hist.close()
+    # Extraer registros directamente desde la pestaña de Google Sheets
+    todos_los_registros = pestaña_registros.get_all_records()
+    
+    # Filtrar solo los registros que corresponden al usuario en sesión
+    datos_usuario = [r for r in todos_los_registros if str(r.get('username', '')) == st.session_state.get('username', '')]
+    
+    df_historial = pd.DataFrame(datos_usuario)
     
     if not df_historial.empty:
+        # Renombrar columnas extraídas de Sheets para mantener compatibilidad con la UI
+        df_historial = df_historial.rename(columns={
+            'fecha': 'Fecha',
+            'peso': 'Peso_kg',
+            'cuello': 'Cuello_cm',
+            'cintura': 'Cintura_cm',
+            'cadera': 'Cadera_cm',
+            'ingesta': 'Ingesta',
+            'activas': 'Gasto_Activo'
+        })
+        
+        # Forzar formato numérico (Sheets puede retornar celdas vacías como strings "")
+        cols_numericas = ['Peso_kg', 'Cuello_cm', 'Cintura_cm', 'Cadera_cm', 'Ingesta', 'Gasto_Activo']
+        for col in cols_numericas:
+            if col in df_historial.columns:
+                df_historial[col] = pd.to_numeric(df_historial[col], errors='coerce').fillna(0)
+        
+        # Ordenar cronológicamente para evitar errores en las líneas de tendencia
+        df_historial['Fecha_dt'] = pd.to_datetime(df_historial['Fecha'], errors='coerce')
+        df_historial = df_historial.sort_values(by='Fecha_dt')
+        
         # Calcular el % de Grasa dinámicamente para toda la matriz histórica
         df_historial['% Grasa'] = df_historial.apply(
             lambda row: calcular_grasa_naval(
@@ -246,7 +274,10 @@ else:
         
         # Reordenar las columnas para priorizar las métricas clave de progreso
         columnas_visibles = ['Fecha', 'Peso_kg', '% Grasa', 'Cuello_cm', 'Cintura_cm', 'Cadera_cm', 'Ingesta', 'Gasto_Activo']
-        df_mostrar = df_historial[columnas_visibles]
+        
+        # Intersección defensiva por si alguna columna falla desde Sheets
+        columnas_existentes = [c for c in columnas_visibles if c in df_historial.columns]
+        df_mostrar = df_historial[columnas_existentes]
         
         st.dataframe(df_mostrar, use_container_width=True)
         
