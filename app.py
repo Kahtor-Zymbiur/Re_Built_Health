@@ -1,22 +1,27 @@
 import streamlit as st
-import sqlite3
 import pandas as pd
 import hashlib
 from datetime import datetime
 import math
+import gspread
+from oauth2client.service_account import ServiceAccountCredentials
+import json
 
 # --- 1. CONFIGURACIÓN DE LA BASE DE DATOS ---
-def init_db():
-    conn = sqlite3.connect('rebuilt_health.db')
-    c = conn.cursor()
-    # Tabla de Usuarios (Cambiado a username)
-    c.execute('''CREATE TABLE IF NOT EXISTS users
-                 (username TEXT PRIMARY KEY, password TEXT, nombre TEXT, sexo TEXT, estatura REAL, edad INTEGER)''')
-    # Tabla de Registros Diarios
-    c.execute('''CREATE TABLE IF NOT EXISTS daily_logs
-                 (username TEXT, fecha TEXT, peso REAL, cuello REAL, cintura REAL, cadera REAL, ingesta_kcal REAL, calorias_activas REAL)''')
-    conn.commit()
-    conn.close()
+def conectar_gsheets():
+    scope = [
+        "https://spreadsheets.google.com/feeds",
+        "https://www.googleapis.com/auth/drive"
+    ]
+    credenciales_dict = json.loads(st.secrets["gcp_service_account"])
+    creds = ServiceAccountCredentials.from_json_keyfile_dict(credenciales_dict, scope)
+    cliente = gspread.authorize(creds)
+    return cliente.open("Rebuilt_Health_Data")
+
+# Inicializar la conexión a las pestañas
+hoja_principal = conectar_gsheets()
+pestaña_usuarios = hoja_principal.worksheet("Usuarios")
+pestaña_registros = hoja_principal.worksheet("Registros")
 
 # --- 2. SEGURIDAD Y AUTENTICACIÓN ---
 def hash_password(password):
