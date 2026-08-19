@@ -248,11 +248,15 @@ else:
     st.subheader("Auditoría Histórica")
     
     todos_los_registros = obtener_registros_seguro(pestaña_registros)
-    datos_usuario = [r for r in todos_los_registros if str(r.get('username', '')) == st.session_state.get('username', '')]
+    datos_usuario = [r for r in todos_los_registros if str(r.get('username', '')).strip() == st.session_state.get('username', '')]
     
     df_historial = pd.DataFrame(datos_usuario)
     
     if not df_historial.empty:
+        # 1. Limpiar columnas (quitar espacios invisibles y forzar minúsculas) para evitar el KeyError
+        df_historial.columns = [str(col).strip().lower() for col in df_historial.columns]
+        
+        # 2. Renombrar al formato oficial de la UI
         df_historial = df_historial.rename(columns={
             'fecha': 'Fecha',
             'peso': 'Peso_kg',
@@ -263,14 +267,23 @@ else:
             'activas': 'Gasto_Activo'
         })
         
+        # 3. Validación defensiva: Si Sheets no envió alguna columna, la creamos artificialmente
+        cols_esperadas = ['Fecha', 'Peso_kg', 'Cuello_cm', 'Cintura_cm', 'Cadera_cm', 'Ingesta', 'Gasto_Activo']
+        for col in cols_esperadas:
+            if col not in df_historial.columns:
+                # Si falta la fecha, ponemos la de hoy; si falta un número, ponemos 0
+                df_historial[col] = str(datetime.now().date()) if col == 'Fecha' else 0
+                
+        # 4. Forzar formato numérico
         cols_numericas = ['Peso_kg', 'Cuello_cm', 'Cintura_cm', 'Cadera_cm', 'Ingesta', 'Gasto_Activo']
         for col in cols_numericas:
-            if col in df_historial.columns:
-                df_historial[col] = pd.to_numeric(df_historial[col], errors='coerce').fillna(0)
+            df_historial[col] = pd.to_numeric(df_historial[col], errors='coerce').fillna(0)
         
+        # 5. Ordenar por fecha cronológica
         df_historial['Fecha_dt'] = pd.to_datetime(df_historial['Fecha'], errors='coerce')
         df_historial = df_historial.sort_values(by='Fecha_dt')
         
+        # 6. Calcular Grasa
         df_historial['% Grasa'] = df_historial.apply(
             lambda row: calcular_grasa_naval(
                 st.session_state['sexo'], 
@@ -281,9 +294,9 @@ else:
             ), axis=1
         ).round(1)
         
+        # 7. Despliegue en pantalla
         columnas_visibles = ['Fecha', 'Peso_kg', '% Grasa', 'Cuello_cm', 'Cintura_cm', 'Cadera_cm', 'Ingesta', 'Gasto_Activo']
-        columnas_existentes = [c for c in columnas_visibles if c in df_historial.columns]
-        df_mostrar = df_historial[columnas_existentes]
+        df_mostrar = df_historial[columnas_visibles]
         
         st.dataframe(df_mostrar, use_container_width=True)
         
