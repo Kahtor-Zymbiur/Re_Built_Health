@@ -28,8 +28,15 @@ pestaña_codigos = hoja_principal.worksheet("Códigos")
 # --- FUNCIÓN DE LECTURA SEGURA PARA EVITAR CRASH DE GSPREAD ---
 def obtener_registros_seguro(pestaña):
     try:
-        return pestaña.get_all_records()
-    except IndexError:
+        data = pestaña.get_all_values()
+        if not data or len(data) < 2:
+            return []
+        
+        df = pd.DataFrame(data[1:], columns=data[0])
+        columnas_validas = [col for col in df.columns if str(col).strip() != ""]
+        df = df[columnas_validas]
+        return df.to_dict('records')
+    except Exception:
         return []
 
 # --- 2. SEGURIDAD, AUTENTICACIÓN Y CÓDIGOS ---
@@ -62,7 +69,7 @@ def verify_login(username, password):
     usuarios = obtener_registros_seguro(pestaña_usuarios)
     
     for user in usuarios:
-        if str(user['username']) == username and str(user['password']) == hashed_pw:
+        if str(user.get('username', '')) == username and str(user.get('password', '')) == hashed_pw:
             return (user['username'], user['password'], user['nombre'], user['sexo'], user['estatura'], user['edad'])
     return None
 
@@ -220,11 +227,12 @@ else:
         
         fila_a_actualizar = None
         for i, registro in enumerate(registros_existentes):
-            if str(registro['username']) == username_actual and str(registro['fecha']) == fecha_hoy:
+            if str(registro.get('username', '')) == username_actual and str(registro.get('fecha', '')) == fecha_hoy:
                 fila_a_actualizar = i + 2
                 break
                 
-        nueva_fila = [username_actual, fecha_hoy, peso, "", cuello, cintura, cadera, ingesta, activas]
+        # Alineado con tus 9 columnas: username | fecha | peso_kg | %grasa | cuello_cm | cintura_cm | cadera_cm | ingesta | cal_activas
+        nueva_fila = [username_actual, fecha_hoy, peso, round(grasa, 1), cuello, cintura, cadera, ingesta, activas]
         
         if fila_a_actualizar:
             rango = f"A{fila_a_actualizar}:I{fila_a_actualizar}"
@@ -248,66 +256,55 @@ else:
     st.subheader("Auditoría Histórica")
     
     todos_los_registros = obtener_registros_seguro(pestaña_registros)
-    datos_usuario = [r for r in todos_los_registros if str(r.get('username', '')).strip() == st.session_state.get('username', '')]
+    datos_usuario = [r for r in todos_los_registros if str(r.get('username', '')) == st.session_state.get('username', '')]
     
     df_historial = pd.DataFrame(datos_usuario)
     
     if not df_historial.empty:
-        # 1. Limpiar columnas (quitar espacios invisibles y forzar minúsculas) para evitar el KeyError
-        df_historial.columns = [str(col).strip().lower() for col in df_historial.columns]
-        
-        # 2. Renombrar al formato oficial de la UI
+        # Mapeamos los nombres exactos que tienes en tu Google Sheets
         df_historial = df_historial.rename(columns={
             'fecha': 'Fecha',
-            'peso': 'peso_kg',
-            'cuello': 'cuello_cm',
-            'cintura': 'cintura_cm',
-            'cadera': 'cadera_cm',
-            'ingesta': 'ingesta',
-            'activas': 'gasto_activo'
+            'peso_kg': 'Peso_kg',
+            'cuello_cm': 'Cuello_cm',
+            'cintura_cm': 'Cintura_cm',
+            'cadera_cm': 'Cadera_cm',
+            'ingesta': 'Ingesta',
+            'cal_activas': 'Gasto_Activo'
         })
         
-        # 3. Validación defensiva: Si Sheets no envió alguna columna, la creamos artificialmente
-        cols_numericas = ['Fecha', 'peso_kg', 'cuello_cm', 'cintura_cm', 'cadera_cm', 'ingesta', 'gasto_activo']
+        cols_numericas = ['Peso_kg', 'Cuello_cm', 'Cintura_cm', 'Cadera_cm', 'Ingesta', 'Gasto_Activo']
         for col in cols_numericas:
-            if col not in df_historial.columns:
-                # Si falta la fecha, ponemos la de hoy; si falta un número, ponemos 0
-                df_historial[col] = str(datetime.now().date()) if col == 'Fecha' else 0
-                
-        # 4. Forzar formato numérico resolviendo el conflicto de las comas decimales
-        cols_numericas = ['peso_kg', 'cuello_cm', 'cintura_cm', 'cadera_cm', 'ingesta', 'gasto_activo']
-        for col in cols_numericas:
-            # Convertir a texto, cambiar coma por punto y luego transformar a número matemático
-            df_historial[col] = df_historial[col].astype(str).str.replace(',', '.')
-            df_historial[col] = pd.to_numeric(df_historial[col], errors='coerce').fillna(0)
+            if col in df_historial.columns:
+                df_historial[col] = df_historial[col].astype(str).str.replace(',', '.')
+                df_historial[col] = pd.to_numeric(df_historial[col], errors='coerce').fillna(0)
         
-        # 5. Ordenar por fecha cronológica
         df_historial['Fecha_dt'] = pd.to_datetime(df_historial['Fecha'], errors='coerce')
         df_historial = df_historial.sort_values(by='Fecha_dt')
         
-        # 6. Calcular Grasa
         df_historial['% Grasa'] = df_historial.apply(
             lambda row: calcular_grasa_naval(
                 st.session_state['sexo'], 
                 st.session_state['estatura'], 
-                row['cuello_cm'], 
-                row['cintura_cm'], 
-                row['cadera_cm']
+                row.get('Cuello_cm', 0), 
+                row.get('Cintura_cm', 0), 
+                row.get('Cadera_cm', 0)
             ), axis=1
         ).round(1)
         
-        # 7. Despliegue en pantalla
-        columnas_visibles = ['fecha', 'peso_kg', '% Grasa', 'cuello_cm', 'cintura_cm', 'cadera_cm', 'ingesta', 'gasto_activo']
-        df_mostrar = df_historial[columnas_visibles]
+        columnas_visibles = ['Fecha', 'Peso_kg', '% Grasa', 'Cuello_cm', 'Cintura_cm', 'Cadera_cm', 'Ingesta', 'Gasto_Activo']
+        columnas_existentes = [c for c in columnas_visibles if c in df_historial.columns]
+        df_mostrar = df_historial[columnas_existentes]
         
         st.dataframe(df_mostrar, use_container_width=True)
         
         col_graf1, col_graf2 = st.columns(2)
         with col_graf1:
             st.markdown("### Tendencia de Peso (kg)")
-            st.line_chart(df_historial.set_index('Fecha')['Peso_kg'], color="#2563EB")
+            if 'Peso_kg' in df_historial.columns:
+                st.line_chart(df_historial.set_index('Fecha')['Peso_kg'], color="#2563EB")
         with col_graf2:
             st.markdown("### Tendencia de Grasa (%)")
-            st.line_chart(df_historial.set_index('Fecha')['% Grasa'], color="#10B981")
+            if '% Grasa' in df_historial.columns:
+                st.line_chart(df_historial.set_index('Fecha')['% Grasa'], color="#10B981")
     else:
         st.info("La matriz de datos está vacía. Comienza tu registro.")
