@@ -289,16 +289,39 @@ else:
         columnas_existentes = [c for c in columnas_visibles if c in df_historial.columns]
         df_mostrar = df_historial[columnas_existentes]
         
-        # 1. Dashboard de Tendencia (Gráficos)
+       # 1. Dashboard de Tendencia (Gráficos)
+        st.markdown("#### Filtro de Tendencias")
+        filtro = st.radio(
+            "Seleccionar período de visualización:", 
+            ["7 Días", "1 Mes", "1 Año", "Historial Completo"], 
+            horizontal=True
+        )
+
+        # Aplicar el filtro de tiempo sobre los datos
+        fecha_actual = pd.to_datetime(datetime.now().date())
+        if filtro == "7 Días":
+            df_grafico = df_historial[df_historial['Fecha_dt'] >= (fecha_actual - pd.Timedelta(days=7))]
+        elif filtro == "1 Mes":
+            df_grafico = df_historial[df_historial['Fecha_dt'] >= (fecha_actual - pd.Timedelta(days=30))]
+        elif filtro == "1 Año":
+            df_grafico = df_historial[df_historial['Fecha_dt'] >= (fecha_actual - pd.Timedelta(days=365))]
+        else:
+            df_grafico = df_historial
+
         col_graf1, col_graf2 = st.columns(2)
         with col_graf1:
             st.markdown("#### Tendencia de Peso (kg)")
-            if 'Peso_kg' in df_historial.columns:
-                st.line_chart(df_historial.set_index('Fecha')['Peso_kg'], color="#2563EB")
+            if 'Peso_kg' in df_grafico.columns and not df_grafico.empty:
+                st.line_chart(df_grafico.set_index('Fecha')['Peso_kg'], color="#2563EB")
+            else:
+                st.info("Sin datos en este período")
+                
         with col_graf2:
             st.markdown("#### Tendencia de Grasa (%)")
-            if '% Grasa' in df_historial.columns:
-                st.line_chart(df_historial.set_index('Fecha')['% Grasa'], color="#10B981")
+            if '% Grasa' in df_grafico.columns and not df_grafico.empty:
+                st.line_chart(df_grafico.set_index('Fecha')['% Grasa'], color="#10B981")
+            else:
+                st.info("Sin datos en este período")
                 
         # 2. Tabla de Auditoría (Filtro de 7 días)
         st.markdown("#### Últimos 7 Registros")
