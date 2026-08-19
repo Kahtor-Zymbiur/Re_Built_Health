@@ -186,6 +186,10 @@ else:
     st.markdown("---")
     
     st.subheader("Ingreso de Datos Diarios")
+    
+    # Campo para seleccionar la fecha de registro
+    fecha_ingreso = st.date_input("Fecha del Registro", value=datetime.now().date())
+    
     col1, col2 = st.columns(2)
     
     with col1:
@@ -209,19 +213,18 @@ else:
         tdee = tmb + activas
         balance = ingesta - tdee
         
-        fecha_hoy = str(datetime.now().date())
+        fecha_registro = str(fecha_ingreso)
         username_actual = st.session_state['username']
         
         registros_existentes = obtener_registros_seguro(pestaña_registros)
         
         fila_a_actualizar = None
         for i, registro in enumerate(registros_existentes):
-            if str(registro.get('username', '')) == username_actual and str(registro.get('fecha', '')) == fecha_hoy:
+            if str(registro.get('username', '')) == username_actual and str(registro.get('fecha', '')) == fecha_registro:
                 fila_a_actualizar = i + 2
                 break
                 
-        # Adaptado a tus 8 columnas actuales exactas de izquierda a derecha
-        nueva_fila = [username_actual, fecha_hoy, peso, cuello, cintura, cadera, ingesta, activas]
+        nueva_fila = [username_actual, fecha_registro, peso, cuello, cintura, cadera, ingesta, activas]
         
         if fila_a_actualizar:
             rango = f"A{fila_a_actualizar}:H{fila_a_actualizar}"
@@ -250,7 +253,6 @@ else:
     df_historial = pd.DataFrame(datos_usuario)
     
     if not df_historial.empty:
-        # Renombramos usando el nombre exacto de la última foto
         df_historial = df_historial.rename(columns={
             'fecha': 'Fecha',
             'peso_kg': 'Peso_kg',
@@ -287,16 +289,30 @@ else:
         columnas_existentes = [c for c in columnas_visibles if c in df_historial.columns]
         df_mostrar = df_historial[columnas_existentes]
         
-        st.dataframe(df_mostrar, use_container_width=True)
-        
+        # 1. Dashboard de Tendencia (Gráficos)
         col_graf1, col_graf2 = st.columns(2)
         with col_graf1:
-            st.markdown("### Tendencia de Peso (kg)")
+            st.markdown("#### Tendencia de Peso (kg)")
             if 'Peso_kg' in df_historial.columns:
                 st.line_chart(df_historial.set_index('Fecha')['Peso_kg'], color="#2563EB")
         with col_graf2:
-            st.markdown("### Tendencia de Grasa (%)")
+            st.markdown("#### Tendencia de Grasa (%)")
             if '% Grasa' in df_historial.columns:
                 st.line_chart(df_historial.set_index('Fecha')['% Grasa'], color="#10B981")
+                
+        # 2. Tabla de Auditoría (Filtro de 7 días)
+        st.markdown("#### Últimos 7 Registros")
+        df_ultimos_7 = df_mostrar.tail(7)
+        st.dataframe(df_ultimos_7, use_container_width=True)
+        
+        # 3. Exportación del Historial Completo
+        csv_data = df_mostrar.to_csv(index=False).encode('utf-8')
+        st.download_button(
+            label="📥 Descargar Historial Completo (CSV)",
+            data=csv_data,
+            file_name=f"Rebuilt_Historial_{st.session_state['username']}.csv",
+            mime="text/csv"
+        )
+        
     else:
         st.info("La matriz de datos está vacía. Comienza tu registro.")
