@@ -274,9 +274,11 @@ else:
                 # Si falta la fecha, ponemos la de hoy; si falta un número, ponemos 0
                 df_historial[col] = str(datetime.now().date()) if col == 'Fecha' else 0
                 
-        # 4. Forzar formato numérico
+        # 4. Forzar formato numérico resolviendo el conflicto de las comas decimales
         cols_numericas = ['Peso_kg', 'Cuello_cm', 'Cintura_cm', 'Cadera_cm', 'Ingesta', 'Gasto_Activo']
         for col in cols_numericas:
+            # Convertir a texto, cambiar coma por punto y luego transformar a número matemático
+            df_historial[col] = df_historial[col].astype(str).str.replace(',', '.')
             df_historial[col] = pd.to_numeric(df_historial[col], errors='coerce').fillna(0)
         
         # 5. Ordenar por fecha cronológica
