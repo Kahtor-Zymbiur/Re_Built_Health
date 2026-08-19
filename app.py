@@ -310,14 +310,14 @@ else:
 
         col_graf1, col_graf2 = st.columns(2)
         with col_graf1:
-            st.markdown("#### Tendencia de Peso (kg)")
+            st.markdown("#### Peso (kg)")
             if 'Peso_kg' in df_grafico.columns and not df_grafico.empty:
                 st.line_chart(df_grafico.set_index('Fecha')['Peso_kg'], color="#2563EB")
             else:
                 st.info("Sin datos en este período")
                 
         with col_graf2:
-            st.markdown("#### Tendencia de Grasa (%)")
+            st.markdown("#### Grasa (%)")
             if '% Grasa' in df_grafico.columns and not df_grafico.empty:
                 st.line_chart(df_grafico.set_index('Fecha')['% Grasa'], color="#10B981")
             else:
