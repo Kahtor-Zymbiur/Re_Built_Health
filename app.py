@@ -290,7 +290,7 @@ else:
         df_mostrar = df_historial[columnas_existentes]
         
        # 1. Dashboard de Tendencia (Gráficos)
-        st.markdown("#### Filtro de Tendencias")
+        st.markdown("#### Tendencias")
         filtro = st.radio(
             "Seleccionar período de visualización:", 
             ["7 Días", "1 Mes", "1 Año", "Historial Completo"], 
