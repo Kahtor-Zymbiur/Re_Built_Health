@@ -19,22 +19,20 @@ def conectar_gsheets():
     cliente = gspread.authorize(creds)
     return cliente.open_by_url("https://docs.google.com/spreadsheets/d/1qh9cq3nPmYEtnQ_QQGXC1F4Ik0UQKI0eI4WeAGmrZ_c/edit?gid=0#gid=0")
 
-# Inicializar la conexión a las pestañas
 hoja_principal = conectar_gsheets()
 pestaña_usuarios = hoja_principal.worksheet("Usuarios")
 pestaña_registros = hoja_principal.worksheet("Registros")
 pestaña_codigos = hoja_principal.worksheet("Códigos")
 
-# --- FUNCIÓN DE LECTURA SEGURA PARA EVITAR CRASH DE GSPREAD ---
+# --- LECTURA SEGURA: EXTRACCIÓN CRUDA ---
 def obtener_registros_seguro(pestaña):
     try:
         data = pestaña.get_all_values()
         if not data or len(data) < 2:
             return []
         
-        df = pd.DataFrame(data[1:], columns=data[0])
-        columnas_validas = [col for col in df.columns if str(col).strip() != ""]
-        df = df[columnas_validas]
+        encabezados = [str(col).strip().lower() for col in data[0]]
+        df = pd.DataFrame(data[1:], columns=encabezados)
         return df.to_dict('records')
     except Exception:
         return []
@@ -57,9 +55,9 @@ def verificar_y_quemar_codigo(codigo_ingresado):
             else:
                 return False, "El estado del código no es válido."
     except gspread.exceptions.CellNotFound:
-        return False, "Código inválido o inexistente. Verifica que esté bien escrito."
+        return False, "Código inválido o inexistente."
     
-    return False, "Error desconocido al verificar el código."
+    return False, "Error desconocido."
 
 def hash_password(password):
     return hashlib.sha256(str.encode(password)).hexdigest()
@@ -70,7 +68,8 @@ def verify_login(username, password):
     
     for user in usuarios:
         if str(user.get('username', '')) == username and str(user.get('password', '')) == hashed_pw:
-            return (user['username'], user['password'], user['nombre'], user['sexo'], user['estatura'], user['edad'])
+            estatura_segura = float(str(user.get('estatura', '170')).replace(',', '.'))
+            return (user['username'], user['password'], user.get('nombre', ''), user.get('sexo', 'H'), estatura_segura, user.get('edad', 0))
     return None
 
 def register_user(username, password, nombre, sexo, estatura, edad):
@@ -82,11 +81,19 @@ def register_user(username, password, nombre, sexo, estatura, edad):
 # --- 3. MOTORES DE CÁLCULO CLÍNICO ---
 def calcular_grasa_naval(sexo, estatura, cuello, cintura, cadera=0):
     try:
+        est = float(str(estatura).replace(',', '.'))
+        cue = float(str(cuello).replace(',', '.'))
+        cin = float(str(cintura).replace(',', '.'))
+        cad = float(str(cadera).replace(',', '.'))
+        
+        if cin <= cue: return 0.0
+            
         if sexo == 'H':
-            return 495 / (1.0324 - 0.19077 * math.log10(cintura - cuello) + 0.15456 * math.log10(estatura)) - 450
+            return 495 / (1.0324 - 0.19077 * math.log10(cin - cue) + 0.15456 * math.log10(est)) - 450
         elif sexo == 'M':
-            return 495 / (1.29579 - 0.35004 * math.log10(cintura + cadera - cuello) + 0.22100 * math.log10(estatura)) - 450
-    except:
+            if (cin + cad) <= cue: return 0.0
+            return 495 / (1.29579 - 0.35004 * math.log10(cin + cad - cue) + 0.22100 * math.log10(est)) - 450
+    except Exception:
         return 0.0
     return 0.0
 
@@ -145,50 +152,32 @@ if not st.session_state['logged_in']:
             
         st.markdown("---")
         
-        with st.expander("📄 Leer Consentimiento Informado y Términos de Uso completos"):
-            st.markdown("""
-            **1. Naturaleza de los Datos:**
-            Los datos recopilados incluyen edad, sexo biológico, medidas antropométricas y registros diarios de ingesta y gasto calórico.
-            
-            **2. Uso para Investigación Científica:**
-            Al utilizar esta plataforma, autorizas que tu información sea almacenada y utilizada de forma estrictamente anonimizada para investigaciones, publicaciones científicas y análisis estadísticos en el área de la salud.
-            
-            **3. Privacidad y Seguridad:**
-            Tus datos de identidad directa (como tu nombre) no serán vinculados a tus métricas corporales en ninguna publicación o base de datos externa. La información se aloja en servidores seguros en la nube con acceso restringido.
-            
-            **4. Derecho a Revocación (Retiro):**
-            El registro de datos es voluntario. Tienes el derecho de solicitar la eliminación total de tu información de nuestro repositorio investigativo en cualquier momento, sin necesidad de justificación y sin que esto afecte el uso futuro de la aplicación.
-            
-            **5. Responsabilidad y Contacto:**
-            Esta plataforma es una herramienta de cuantificación y no sustituye la evaluación médica profesional. Para consultas sobre la privacidad de tu información o para ejercer tu derecho a eliminar tus datos del estudio, contáctanos a través de nuestro Instagram oficial: **@re_built_health**.
-            """)
+        with st.expander("📄 Leer Consentimiento Informado"):
+            st.markdown("Al utilizar esta plataforma, autorizas que tu información sea almacenada y utilizada de forma estrictamente anonimizada para investigaciones en el área de la salud.")
 
-        st.markdown("**Consentimiento**")
-        consentimiento = st.checkbox("He leído y acepto el consentimiento informado para el uso de datos en investigación.", key="reg_consent")
+        consentimiento = st.checkbox("He leído y acepto el consentimiento informado.", key="reg_consent")
         st.markdown("---")
             
         if st.button("Crear Cuenta"):
             if not consentimiento:
-                st.warning("Debes aceptar el consentimiento informado para crear una cuenta.")
+                st.warning("Debes aceptar el consentimiento informado.")
             elif not new_codigo:
-                st.warning("Debes ingresar el código de acceso enviado a tu correo.")
+                st.warning("Debes ingresar tu código.")
             else:
-                usuarios_existentes = pestaña_usuarios.col_values(1)
+                usuarios_existentes = [str(u.get('username', '')) for u in obtener_registros_seguro(pestaña_usuarios)]
                 if new_username in usuarios_existentes:
-                    st.error("Este nombre de usuario ya está en uso. Por favor elige otro.")
+                    st.error("Nombre de usuario en uso.")
                 else:
                     es_valido, msj_codigo = verificar_y_quemar_codigo(new_codigo)
-                    
                     if es_valido:
                         register_user(new_username, new_password, new_nombre, new_sexo, new_estatura, new_edad)
-                        st.success("Cuenta creada exitosamente. Selecciona 'Iniciar Sesión' en el menú lateral.")
+                        st.success("Cuenta creada. Inicia sesión.")
                         st.session_state['last_registered_user'] = new_username
                     else:
                         st.error(msj_codigo)
 
 else:
-    # --- DASHBOARD PRINCIPAL (Usuario Logueado) ---
-    st.sidebar.title(f"Bienvenido, {st.session_state['nombre']}")
+    st.sidebar.title(f"Bienvenido, {st.session_state.get('nombre', '')}")
     if st.sidebar.button("Cerrar Sesión"):
         st.session_state['logged_in'] = False
         st.rerun()
@@ -206,13 +195,13 @@ else:
         
     with col2:
         cadera = 0.0
-        if st.session_state['sexo'] == 'M':
+        if st.session_state.get('sexo', 'H') == 'M':
             cadera = st.number_input("Cadera (cm)", min_value=50.0, max_value=150.0, step=0.1)
         else:
             st.text_input("Cadera (cm)", value="No requerido (Biología H)", disabled=True)
             
         ingesta = st.number_input("Ingesta Total (kcal)", min_value=0.0, step=10.0)
-        activas = st.number_input("Calorías Activas (Apple Watch/Garmin)", min_value=0.0, step=10.0)
+        activas = st.number_input("Calorías Activas", min_value=0.0, step=10.0)
         
     if st.button("Calcular y Registrar"):
         grasa = calcular_grasa_naval(st.session_state['sexo'], st.session_state['estatura'], cuello, cintura, cadera)
@@ -231,11 +220,11 @@ else:
                 fila_a_actualizar = i + 2
                 break
                 
-        # Alineado con tus 9 columnas: username | fecha | peso_kg | %grasa | cuello_cm | cintura_cm | cadera_cm | ingesta | cal_activas
-        nueva_fila = [username_actual, fecha_hoy, peso, round(grasa, 1), cuello, cintura, cadera, ingesta, activas]
+        # Adaptado a tus 8 columnas actuales exactas de izquierda a derecha
+        nueva_fila = [username_actual, fecha_hoy, peso, cuello, cintura, cadera, ingesta, activas]
         
         if fila_a_actualizar:
-            rango = f"A{fila_a_actualizar}:I{fila_a_actualizar}"
+            rango = f"A{fila_a_actualizar}:H{fila_a_actualizar}"
             pestaña_registros.update(rango, [nueva_fila])
         else:
             pestaña_registros.append_row(nueva_fila)
@@ -261,10 +250,7 @@ else:
     df_historial = pd.DataFrame(datos_usuario)
     
     if not df_historial.empty:
-        # 1. Limpiar espacios invisibles y forzar minúsculas en los encabezados de Google Sheets
-        df_historial.columns = df_historial.columns.str.strip().str.lower()
-        
-        # 2. Mapear los nombres a la versión de la interfaz
+        # Renombramos usando el nombre exacto de la última foto
         df_historial = df_historial.rename(columns={
             'fecha': 'Fecha',
             'peso_kg': 'Peso_kg',
@@ -272,36 +258,31 @@ else:
             'cintura_cm': 'Cintura_cm',
             'cadera_cm': 'Cadera_cm',
             'ingesta': 'Ingesta',
-            'cal_activas': 'Gasto_Activo'
+            'gasto_activo': 'Gasto_Activo'
         })
         
-        # 3. Asegurar que las columnas numéricas existan y dar formato matemático
         cols_numericas = ['Peso_kg', 'Cuello_cm', 'Cintura_cm', 'Cadera_cm', 'Ingesta', 'Gasto_Activo']
         for col in cols_numericas:
             if col not in df_historial.columns:
                 df_historial[col] = 0.0
             df_historial[col] = df_historial[col].astype(str).str.replace(',', '.')
-            df_historial[col] = pd.to_numeric(df_historial[col], errors='coerce').fillna(0)
+            df_historial[col] = pd.to_numeric(df_historial[col], errors='coerce').fillna(0.0)
         
-        # 4. Ordenar fechas
         if 'Fecha' not in df_historial.columns:
             df_historial['Fecha'] = str(datetime.now().date())
-            
         df_historial['Fecha_dt'] = pd.to_datetime(df_historial['Fecha'], errors='coerce')
         df_historial = df_historial.sort_values(by='Fecha_dt')
         
-        # 5. Calcular Grasa dinámicamente con las variables ya limpias
         df_historial['% Grasa'] = df_historial.apply(
             lambda row: calcular_grasa_naval(
                 st.session_state.get('sexo', 'H'), 
                 st.session_state.get('estatura', 170.0), 
-                row['Cuello_cm'], 
-                row['Cintura_cm'], 
-                row['Cadera_cm']
+                row.get('Cuello_cm', 0.0), 
+                row.get('Cintura_cm', 0.0), 
+                row.get('Cadera_cm', 0.0)
             ), axis=1
         ).round(1)
         
-        # 6. Despliegue de datos en tabla
         columnas_visibles = ['Fecha', 'Peso_kg', '% Grasa', 'Cuello_cm', 'Cintura_cm', 'Cadera_cm', 'Ingesta', 'Gasto_Activo']
         columnas_existentes = [c for c in columnas_visibles if c in df_historial.columns]
         df_mostrar = df_historial[columnas_existentes]
