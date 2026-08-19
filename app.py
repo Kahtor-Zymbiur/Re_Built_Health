@@ -297,7 +297,7 @@ else:
         ).round(1)
         
         # 7. Despliegue en pantalla
-        columnas_visibles = ['Fecha', 'Peso_kg', '% Grasa', 'Cuello_cm', 'Cintura_cm', 'Cadera_cm', 'Ingesta', 'Gasto_Activo']
+        columnas_visibles = ['fecha', 'peso_kg', '% Grasa', 'cuello_cm', 'cintura_cm', 'cadera_cm', 'ingesta', 'gasto_activo']
         df_mostrar = df_historial[columnas_visibles]
         
         st.dataframe(df_mostrar, use_container_width=True)
