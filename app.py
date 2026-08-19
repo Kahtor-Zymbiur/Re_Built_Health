@@ -25,6 +25,13 @@ pestaña_usuarios = hoja_principal.worksheet("Usuarios")
 pestaña_registros = hoja_principal.worksheet("Registros")
 pestaña_codigos = hoja_principal.worksheet("Códigos")
 
+# --- FUNCIÓN DE LECTURA SEGURA PARA EVITAR CRASH DE GSPREAD ---
+def obtener_registros_seguro(pestaña):
+    try:
+        return pestaña.get_all_records()
+    except IndexError:
+        return []
+
 # --- 2. SEGURIDAD, AUTENTICACIÓN Y CÓDIGOS ---
 def verificar_y_quemar_codigo(codigo_ingresado):
     try:
@@ -52,7 +59,7 @@ def hash_password(password):
 
 def verify_login(username, password):
     hashed_pw = hash_password(password)
-    usuarios = pestaña_usuarios.get_all_records()
+    usuarios = obtener_registros_seguro(pestaña_usuarios)
     
     for user in usuarios:
         if str(user['username']) == username and str(user['password']) == hashed_pw:
@@ -209,7 +216,7 @@ else:
         fecha_hoy = str(datetime.now().date())
         username_actual = st.session_state['username']
         
-        registros_existentes = pestaña_registros.get_all_records()
+        registros_existentes = obtener_registros_seguro(pestaña_registros)
         
         fila_a_actualizar = None
         for i, registro in enumerate(registros_existentes):
@@ -221,7 +228,6 @@ else:
         
         if fila_a_actualizar:
             rango = f"A{fila_a_actualizar}:I{fila_a_actualizar}"
-            # Corrección de sintaxis de actualización para gspread 5.12.0
             pestaña_registros.update(rango, [nueva_fila])
         else:
             pestaña_registros.append_row(nueva_fila)
@@ -241,7 +247,7 @@ else:
     st.markdown("---")
     st.subheader("Auditoría Histórica")
     
-    todos_los_registros = pestaña_registros.get_all_records()
+    todos_los_registros = obtener_registros_seguro(pestaña_registros)
     datos_usuario = [r for r in todos_los_registros if str(r.get('username', '')) == st.session_state.get('username', '')]
     
     df_historial = pd.DataFrame(datos_usuario)
