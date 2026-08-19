@@ -256,12 +256,15 @@ else:
     st.subheader("Auditoría Histórica")
     
     todos_los_registros = obtener_registros_seguro(pestaña_registros)
-    datos_usuario = [r for r in todos_los_registros if str(r.get('username', '')) == st.session_state.get('username', '')]
+    datos_usuario = [r for r in todos_los_registros if str(r.get('username', '')).strip() == st.session_state.get('username', '')]
     
     df_historial = pd.DataFrame(datos_usuario)
     
     if not df_historial.empty:
-        # Mapeamos los nombres exactos que tienes en tu Google Sheets
+        # 1. Limpiar espacios invisibles y forzar minúsculas en los encabezados de Google Sheets
+        df_historial.columns = df_historial.columns.str.strip().str.lower()
+        
+        # 2. Mapear los nombres a la versión de la interfaz
         df_historial = df_historial.rename(columns={
             'fecha': 'Fecha',
             'peso_kg': 'Peso_kg',
@@ -272,25 +275,33 @@ else:
             'cal_activas': 'Gasto_Activo'
         })
         
+        # 3. Asegurar que las columnas numéricas existan y dar formato matemático
         cols_numericas = ['Peso_kg', 'Cuello_cm', 'Cintura_cm', 'Cadera_cm', 'Ingesta', 'Gasto_Activo']
         for col in cols_numericas:
-            if col in df_historial.columns:
-                df_historial[col] = df_historial[col].astype(str).str.replace(',', '.')
-                df_historial[col] = pd.to_numeric(df_historial[col], errors='coerce').fillna(0)
+            if col not in df_historial.columns:
+                df_historial[col] = 0.0
+            df_historial[col] = df_historial[col].astype(str).str.replace(',', '.')
+            df_historial[col] = pd.to_numeric(df_historial[col], errors='coerce').fillna(0)
         
+        # 4. Ordenar fechas
+        if 'Fecha' not in df_historial.columns:
+            df_historial['Fecha'] = str(datetime.now().date())
+            
         df_historial['Fecha_dt'] = pd.to_datetime(df_historial['Fecha'], errors='coerce')
         df_historial = df_historial.sort_values(by='Fecha_dt')
         
+        # 5. Calcular Grasa dinámicamente con las variables ya limpias
         df_historial['% Grasa'] = df_historial.apply(
             lambda row: calcular_grasa_naval(
-                st.session_state['sexo'], 
-                st.session_state['estatura'], 
-                row.get('Cuello_cm', 0), 
-                row.get('Cintura_cm', 0), 
-                row.get('Cadera_cm', 0)
+                st.session_state.get('sexo', 'H'), 
+                st.session_state.get('estatura', 170.0), 
+                row['Cuello_cm'], 
+                row['Cintura_cm'], 
+                row['Cadera_cm']
             ), axis=1
         ).round(1)
         
+        # 6. Despliegue de datos en tabla
         columnas_visibles = ['Fecha', 'Peso_kg', '% Grasa', 'Cuello_cm', 'Cintura_cm', 'Cadera_cm', 'Ingesta', 'Gasto_Activo']
         columnas_existentes = [c for c in columnas_visibles if c in df_historial.columns]
         df_mostrar = df_historial[columnas_existentes]
