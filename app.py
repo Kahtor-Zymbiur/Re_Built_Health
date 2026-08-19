@@ -270,26 +270,35 @@ else:
         # 3. Validación defensiva: Si Sheets no envió alguna columna, la creamos artificialmente
         cols_numericas = ['Fecha', 'peso_kg', 'cuello_cm', 'cintura_cm', 'cadera_cm', 'ingesta', 'gasto_activo']
         for col in cols_numericas:
-            if col in df_historial.columns:
-                df_historial[col] = pd.to_numeric(df_historial[col], errors='coerce').fillna(0)
+            if col not in df_historial.columns:
+                # Si falta la fecha, ponemos la de hoy; si falta un número, ponemos 0
+                df_historial[col] = str(datetime.now().date()) if col == 'Fecha' else 0
+                
+        # 4. Forzar formato numérico resolviendo el conflicto de las comas decimales
+        cols_numericas = ['peso_kg', 'cuello_cm', 'cintura_cm', 'cadera_cm', 'ingesta', 'gasto_activo']
+        for col in cols_numericas:
+            # Convertir a texto, cambiar coma por punto y luego transformar a número matemático
+            df_historial[col] = df_historial[col].astype(str).str.replace(',', '.')
+            df_historial[col] = pd.to_numeric(df_historial[col], errors='coerce').fillna(0)
         
+        # 5. Ordenar por fecha cronológica
         df_historial['Fecha_dt'] = pd.to_datetime(df_historial['Fecha'], errors='coerce')
         df_historial = df_historial.sort_values(by='Fecha_dt')
         
-        # El % de Grasa se calcula dinámicamente aquí, por eso no importa el 0 de la planilla
+        # 6. Calcular Grasa
         df_historial['% Grasa'] = df_historial.apply(
             lambda row: calcular_grasa_naval(
                 st.session_state['sexo'], 
                 st.session_state['estatura'], 
-                row['Cuello_cm'], 
-                row['Cintura_cm'], 
-                row['Cadera_cm']
+                row['cuello_cm'], 
+                row['cintura_cm'], 
+                row['cadera_cm']
             ), axis=1
         ).round(1)
         
+        # 7. Despliegue en pantalla
         columnas_visibles = ['Fecha', 'Peso_kg', '% Grasa', 'Cuello_cm', 'Cintura_cm', 'Cadera_cm', 'Ingesta', 'Gasto_Activo']
-        columnas_existentes = [c for c in columnas_visibles if c in df_historial.columns]
-        df_mostrar = df_historial[columnas_existentes]
+        df_mostrar = df_historial[columnas_visibles]
         
         st.dataframe(df_mostrar, use_container_width=True)
         
