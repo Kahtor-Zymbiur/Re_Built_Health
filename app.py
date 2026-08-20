@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 import hashlib
-from datetime import datetime
+from datetime import datetime, date
 import math
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
@@ -69,16 +69,29 @@ def verify_login(username, password):
     for user in usuarios:
         if str(user.get('username', '')) == username and str(user.get('password', '')) == hashed_pw:
             estatura_segura = float(str(user.get('estatura', '170')).replace(',', '.'))
-            return (user['username'], user['password'], user.get('nombre', ''), user.get('sexo', 'H'), estatura_segura, user.get('edad', 0))
+            # Busca fecha_nacimiento, si no existe toma 'edad' por retrocompatibilidad
+            fecha_nac = user.get('fecha_nacimiento', user.get('edad', '1990-01-01'))
+            return (user['username'], user['password'], user.get('nombre', ''), user.get('sexo', 'H'), estatura_segura, fecha_nac)
     return None
 
-def register_user(username, password, nombre, sexo, estatura, edad):
+def register_user(username, password, nombre, sexo, estatura, fecha_nacimiento):
     hashed_pw = hash_password(password)
-    nueva_fila = [username, hashed_pw, nombre, sexo, float(estatura), int(edad)]
+    nueva_fila = [username, hashed_pw, nombre, sexo, float(estatura), str(fecha_nacimiento)]
     pestaña_usuarios.append_row(nueva_fila)
     return True
 
 # --- 3. MOTORES DE CÁLCULO CLÍNICO ---
+def calcular_edad(fecha_nac_str):
+    try:
+        fn = datetime.strptime(str(fecha_nac_str).strip(), "%Y-%m-%d").date()
+        hoy = datetime.now().date()
+        return hoy.year - fn.year - ((hoy.month, hoy.day) < (fn.month, fn.day))
+    except Exception:
+        try:
+            return int(fecha_nac_str)
+        except:
+            return 0
+
 def calcular_grasa_naval(sexo, estatura, cuello, cintura, cadera=0):
     try:
         est = float(str(estatura).replace(',', '.'))
@@ -130,6 +143,7 @@ if not st.session_state['logged_in']:
                 st.session_state['nombre'] = user[2]
                 st.session_state['sexo'] = user[3]
                 st.session_state['estatura'] = user[4]
+                st.session_state['fecha_nacimiento'] = user[5]
                 st.rerun()
             else:
                 st.error("Credenciales incorrectas.")
@@ -148,7 +162,7 @@ if not st.session_state['logged_in']:
         with col2:
             new_estatura = st.number_input("Estatura (cm)", min_value=100.0, max_value=250.0, step=0.1, key="reg_estatura")
         with col3:
-            new_edad = st.number_input("Edad", min_value=15, max_value=100, step=1, key="reg_edad")
+            new_fecha_nac = st.date_input("Fecha de Nacimiento", min_value=date(1920, 1, 1), max_value=datetime.now().date(), key="reg_nac")
             
         st.markdown("---")
         
@@ -170,7 +184,7 @@ if not st.session_state['logged_in']:
                 else:
                     es_valido, msj_codigo = verificar_y_quemar_codigo(new_codigo)
                     if es_valido:
-                        register_user(new_username, new_password, new_nombre, new_sexo, new_estatura, new_edad)
+                        register_user(new_username, new_password, new_nombre, new_sexo, new_estatura, new_fecha_nac)
                         st.success("Cuenta creada. Inicia sesión.")
                         st.session_state['last_registered_user'] = new_username
                     else:
@@ -183,11 +197,46 @@ else:
         st.rerun()
         
     st.title("Panel Clínico de Control")
+    
+    # --- CÁLCULO DE DATOS PARA EL PANEL ---
+    todos_los_registros = obtener_registros_seguro(pestaña_registros)
+    datos_usuario = [r for r in todos_los_registros if str(r.get('username', '')).strip() == st.session_state.get('username', '')]
+    
+    edad_actual = calcular_edad(st.session_state.get('fecha_nacimiento', '1990-01-01'))
+    lbm_actual = 0.0
+    tmb_actual = 0.0
+    
+    if datos_usuario:
+        df_temp = pd.DataFrame(datos_usuario)
+        df_temp['fecha_dt'] = pd.to_datetime(df_temp['fecha'], errors='coerce')
+        df_temp = df_temp.sort_values(by='fecha_dt')
+        ultimo_reg = df_temp.iloc[-1]
+        
+        ultimo_peso = float(str(ultimo_reg.get('peso_kg', 0)).replace(',', '.'))
+        ultimo_cuello = float(str(ultimo_reg.get('cuello_cm', 0)).replace(',', '.'))
+        ultima_cintura = float(str(ultimo_reg.get('cintura_cm', 0)).replace(',', '.'))
+        ultima_cadera = float(str(ultimo_reg.get('cadera_cm', 0)).replace(',', '.'))
+        
+        ultima_grasa = calcular_grasa_naval(st.session_state.get('sexo', 'H'), st.session_state.get('estatura', 170.0), ultimo_cuello, ultima_cintura, ultima_cadera)
+        lbm_actual, tmb_actual = calcular_katch_mcardle(ultimo_peso, ultima_grasa)
+
+    # --- RENDERIZADO DEL PANEL CLÍNICO ---
+    st.subheader("📋 Datos y antecedentes metabólicos")
+    col_p1, col_p2, col_p3, col_p4 = st.columns(4)
+    with col_p1:
+        st.metric(label="Edad", value=f"{edad_actual} años")
+    with col_p2:
+        st.metric(label="Altura", value=f"{st.session_state.get('estatura', 0)} cm")
+    with col_p3:
+        st.metric(label="Masa Magra (Actual)", value=f"{lbm_actual:.1f} kg")
+    with col_p4:
+        st.metric(label="TMB (Actual)", value=f"{tmb_actual:.0f} kcal")
+        
     st.markdown("---")
     
-    st.subheader("Ingreso de Datos Diarios")
+    # --- FORMULARIO DE INGRESO DIARIO ---
+    st.subheader("📝 Ingreso de Datos Diarios")
     
-    # Campo para seleccionar la fecha de registro
     fecha_ingreso = st.date_input("Fecha del Registro", value=datetime.now().date())
     
     col1, col2 = st.columns(2)
@@ -216,10 +265,8 @@ else:
         fecha_registro = str(fecha_ingreso)
         username_actual = st.session_state['username']
         
-        registros_existentes = obtener_registros_seguro(pestaña_registros)
-        
         fila_a_actualizar = None
-        for i, registro in enumerate(registros_existentes):
+        for i, registro in enumerate(todos_los_registros):
             if str(registro.get('username', '')) == username_actual and str(registro.get('fecha', '')) == fecha_registro:
                 fila_a_actualizar = i + 2
                 break
@@ -246,9 +293,6 @@ else:
     # --- HISTORIAL Y TENDENCIAS ---
     st.markdown("---")
     st.subheader("Auditoría Histórica")
-    
-    todos_los_registros = obtener_registros_seguro(pestaña_registros)
-    datos_usuario = [r for r in todos_los_registros if str(r.get('username', '')).strip() == st.session_state.get('username', '')]
     
     df_historial = pd.DataFrame(datos_usuario)
     
@@ -289,7 +333,6 @@ else:
         columnas_existentes = [c for c in columnas_visibles if c in df_historial.columns]
         df_mostrar = df_historial[columnas_existentes]
         
-       # 1. Dashboard de Tendencia (Gráficos)
         st.markdown("#### Tendencias")
         filtro = st.radio(
             "Seleccionar período de visualización:", 
@@ -297,7 +340,6 @@ else:
             horizontal=True
         )
 
-        # Aplicar el filtro de tiempo sobre los datos
         fecha_actual = pd.to_datetime(datetime.now().date())
         if filtro == "7 Días":
             df_grafico = df_historial[df_historial['Fecha_dt'] >= (fecha_actual - pd.Timedelta(days=7))]
@@ -323,12 +365,10 @@ else:
             else:
                 st.info("Sin datos en este período")
                 
-        # 2. Tabla de Auditoría (Filtro de 7 días)
         st.markdown("#### Últimos 7 Registros")
         df_ultimos_7 = df_mostrar.tail(7)
         st.dataframe(df_ultimos_7, use_container_width=True)
         
-        # 3. Exportación del Historial Completo
         csv_data = df_mostrar.to_csv(index=False).encode('utf-8')
         st.download_button(
             label="📥 Descargar Historial Completo (CSV)",
