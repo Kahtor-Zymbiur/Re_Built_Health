@@ -162,7 +162,21 @@ if not st.session_state['logged_in']:
         with col2:
             new_estatura = st.number_input("Estatura (cm)", min_value=100.0, max_value=250.0, step=0.1, key="reg_estatura")
         with col3:
-            new_fecha_nac = st.date_input("Fecha de Nacimiento", min_value=date(1920, 1, 1), max_value=datetime.now().date(), key="reg_nac")
+            st.markdown("<span style='font-size: 14px;'>Fecha de Nacimiento</span>", unsafe_allow_html=True)
+            c_dia, c_mes, c_ano = st.columns(3)
+            with c_dia:
+                dia = st.selectbox("Día", list(range(1, 32)), key="reg_dia")
+            with c_mes:
+                mes = st.selectbox("Mes", list(range(1, 13)), key="reg_mes")
+            with c_ano:
+                # Lista desde el año actual hacia atrás. Index 36 selecciona 1990 por defecto (2026 - 36).
+                ano = st.selectbox("Año", list(range(datetime.now().year, 1919, -1)), index=36, key="reg_ano")
+            
+            try:
+                new_fecha_nac = date(ano, mes, dia)
+            except ValueError:
+                st.error("Fecha inválida (ej. 31 de febrero)")
+                new_fecha_nac = date(1990, 1, 1) # Valor de respaldo
             
         st.markdown("---")
         
