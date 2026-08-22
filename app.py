@@ -79,7 +79,7 @@ TEXTS = {
         'imperial': 'Imperial (lbs/in)',
         'lang_label': 'Idioma / Language',
         'unit_label': 'Sistema de Medidas',
-        'reader_title': '📖 Lector del Manual',
+        'reader_btn': '📖 Abrir Manual de Usuario',
         'prev': '⬅️ Anterior',
         'next': 'Siguiente ➡️',
         'page': 'Página',
@@ -156,7 +156,7 @@ TEXTS = {
         'imperial': 'Imperial (lbs/in)',
         'lang_label': 'Language',
         'unit_label': 'Measurement System',
-        'reader_title': '📖 Manual Reader',
+        'reader_btn': '📖 Open User Manual',
         'prev': '⬅️ Previous',
         'next': 'Next ➡️',
         'page': 'Page',
@@ -284,6 +284,19 @@ def calcular_katch_mcardle(peso, porcentaje_grasa):
 # --- 4. INTERFAZ DE USUARIO (UI) ---
 st.set_page_config(page_title="Re/Built Health", layout="centered")
 
+# --- CSS RESPONSIVO PARA FORZAR AL MODAL A OCUPAR TODA LA PANTALLA EN MÓVILES ---
+st.markdown("""
+    <style>
+    /* Hace que la ventana flotante (modal) ocupe casi el 95% de la pantalla en dispositivos móviles y se adapte */
+    div[data-testid="stModal"] > div {
+        width: 95vw !important;
+        max-width: 900px !important;
+        height: 90vh !important;
+        top: 5vh !important;
+    }
+    </style>
+""", unsafe_allow_html=True)
+
 # Inicializar estados
 if 'logged_in' not in st.session_state: st.session_state['logged_in'] = False
 if 'last_registered_user' not in st.session_state: st.session_state['last_registered_user'] = ""
@@ -308,6 +321,51 @@ if unit_sel != st.session_state['unit_sys']:
 sys = st.session_state['unit_sys']
 w_unit = "kg" if sys == 'Métrico (kg/cm)' else "lbs"
 d_unit = "cm" if sys == 'Métrico (kg/cm)' else "in"
+
+# --- VENTANA EMERGENTE (MODAL) ADAPTABLE ---
+@st.dialog("📖 Manual de Usuario / User Manual", width="large")
+def abrir_modal_manual():
+    if st.session_state.get('lang', 'ES') == 'EN':
+        ruta_manual = "manual_en.pdf"
+    else:
+        ruta_manual = "manual_es.pdf"
+
+    try:
+        doc = fitz.open(ruta_manual)
+        total_paginas = len(doc)
+        
+        if 'pagina_actual' not in st.session_state:
+            st.session_state['pagina_actual'] = 0
+            st.session_state['pdf_cargado'] = ruta_manual
+            
+        if st.session_state.get('pdf_cargado') != ruta_manual:
+            st.session_state['pagina_actual'] = 0
+            st.session_state['pdf_cargado'] = ruta_manual
+
+        col_nav1, col_nav2, col_nav3 = st.columns([1, 2, 1])
+        
+        with col_nav1:
+            if st.button(t('prev')) and st.session_state['pagina_actual'] > 0:
+                st.session_state['pagina_actual'] -= 1
+                st.rerun()
+                
+        with col_nav2:
+            st.markdown(f"<p style='text-align: center; font-weight: bold;'>{t('page')} {st.session_state['pagina_actual'] + 1} {t('of')} {total_paginas}</p>", unsafe_allow_html=True)
+            
+        with col_nav3:
+            if st.button(t('next')) and st.session_state['pagina_actual'] < total_paginas - 1:
+                st.session_state['pagina_actual'] += 1
+                st.rerun()
+
+        pagina = doc.load_page(st.session_state['pagina_actual'])
+        imagen_pagina = pagina.get_pixmap(dpi=150)
+        
+        st.image(imagen_pagina.tobytes(), use_container_width=True)
+
+    except FileNotFoundError:
+        st.info(f"{t('pdf_not_found')} ('{ruta_manual}')")
+    except Exception as e:
+        st.error(f"{t('manual_error')} {e}")
 
 if not st.session_state['logged_in']:
     st.title(t('title'))
@@ -356,7 +414,7 @@ if not st.session_state['logged_in']:
             with c_dia:
                 dia = st.selectbox(t('day'), list(range(1, 32)), key="reg_dia")
             with c_mes:
-                mes = st.selectbox(t('month'), list(range(1, 13)), key="reg_mes")
+                mes = st.selectbox(t('mes'), list(range(1, 13)), key="reg_mes")
             with c_ano:
                 ano = st.selectbox(t('year'), list(range(datetime.now().year, 1919, -1)), index=36, key="reg_ano")
             
@@ -394,6 +452,10 @@ if not st.session_state['logged_in']:
 
 else:
     st.sidebar.title(f"{t('welcome')}, {st.session_state.get('nombre', '')}")
+    
+    if st.sidebar.button(t('reader_btn')):
+        abrir_modal_manual()
+        
     if st.sidebar.button(t('logout')):
         st.session_state['logged_in'] = False
         st.rerun()
@@ -598,59 +660,8 @@ else:
             label=t('download_csv'),
             data=csv_data,
             file_name=f"Rebuilt_Historial_{st.session_state.get('username', 'usuario')}.csv",
-            mime="text/csv"
+            mime="text/css"
         )
         
     else:
         st.info(t('empty_matrix'))
-
-    # --- LECTOR DE MANUAL INTEGRADO ---
-    st.markdown("---")
-    st.subheader(t('reader_title'))
-
-    # 1. Seleccionar el archivo correcto según el idioma elegido
-    if st.session_state.get('lang', 'ES') == 'EN':
-        ruta_manual = "manual_en.pdf"
-    else:
-        ruta_manual = "manual_es.pdf"
-
-    try:
-        # 2. Abrir el documento correspondiente
-        doc = fitz.open(ruta_manual)
-        total_paginas = len(doc)
-        
-        # 3. Controlar la página actual (Si cambia el idioma, reiniciar a la página 1)
-        if 'pagina_actual' not in st.session_state:
-            st.session_state['pagina_actual'] = 0
-            st.session_state['pdf_cargado'] = ruta_manual
-            
-        if st.session_state.get('pdf_cargado') != ruta_manual:
-            st.session_state['pagina_actual'] = 0
-            st.session_state['pdf_cargado'] = ruta_manual
-
-        # 4. Crear botones de navegación interactiva
-        col_nav1, col_nav2, col_nav3 = st.columns([1, 2, 1])
-        
-        with col_nav1:
-            if st.button(t('prev')) and st.session_state['pagina_actual'] > 0:
-                st.session_state['pagina_actual'] -= 1
-                st.rerun()
-                
-        with col_nav2:
-            st.markdown(f"<p style='text-align: center; font-weight: bold;'>{t('page')} {st.session_state['pagina_actual'] + 1} {t('of')} {total_paginas}</p>", unsafe_allow_html=True)
-            
-        with col_nav3:
-            if st.button(t('next')) and st.session_state['pagina_actual'] < total_paginas - 1:
-                st.session_state['pagina_actual'] += 1
-                st.rerun()
-
-        # 5. Extraer y mostrar la imagen de la página actual para proteger el contenido
-        pagina = doc.load_page(st.session_state['pagina_actual'])
-        imagen_pagina = pagina.get_pixmap(dpi=150)
-        
-        st.image(imagen_pagina.tobytes(), use_container_width=True)
-
-    except FileNotFoundError:
-        st.info(f"{t('pdf_not_found')} ('{ruta_manual}')")
-    except Exception as e:
-        st.error(f"{t('manual_error')} {e}")
