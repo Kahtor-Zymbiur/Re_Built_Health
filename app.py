@@ -345,17 +345,17 @@ def abrir_modal_manual():
         col_nav1, col_nav2, col_nav3 = st.columns([1, 2, 1])
         
         with col_nav1:
+            # Eliminado st.rerun()
             if st.button(t('prev')) and st.session_state['pagina_actual'] > 0:
                 st.session_state['pagina_actual'] -= 1
-                st.rerun()
                 
         with col_nav2:
             st.markdown(f"<p style='text-align: center; font-weight: bold;'>{t('page')} {st.session_state['pagina_actual'] + 1} {t('of')} {total_paginas}</p>", unsafe_allow_html=True)
             
         with col_nav3:
+            # Eliminado st.rerun()
             if st.button(t('next')) and st.session_state['pagina_actual'] < total_paginas - 1:
                 st.session_state['pagina_actual'] += 1
-                st.rerun()
 
         pagina = doc.load_page(st.session_state['pagina_actual'])
         imagen_pagina = pagina.get_pixmap(dpi=150)
