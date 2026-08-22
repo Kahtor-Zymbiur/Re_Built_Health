@@ -6,6 +6,7 @@ import math
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 import json
+import fitz  # Librería PyMuPDF para el lector interactivo
 
 # --- DICCIONARIO DE TRADUCCIONES ---
 TEXTS = {
@@ -77,7 +78,14 @@ TEXTS = {
         'metric': 'Métrico (kg/cm)',
         'imperial': 'Imperial (lbs/in)',
         'lang_label': 'Idioma / Language',
-        'unit_label': 'Sistema de Medidas'
+        'unit_label': 'Sistema de Medidas',
+        'reader_title': '📖 Lector del Manual',
+        'prev': '⬅️ Anterior',
+        'next': 'Siguiente ➡️',
+        'page': 'Página',
+        'of': 'de',
+        'manual_error': 'Error al cargar el lector:',
+        'pdf_not_found': 'El archivo no se encuentra en el servidor. Por favor, asegúrate de que esté en la carpeta.'
     },
     'EN': {
         'title': 'RE/BUILT HEALTH',
@@ -147,7 +155,14 @@ TEXTS = {
         'metric': 'Metric (kg/cm)',
         'imperial': 'Imperial (lbs/in)',
         'lang_label': 'Language',
-        'unit_label': 'Measurement System'
+        'unit_label': 'Measurement System',
+        'reader_title': '📖 Manual Reader',
+        'prev': '⬅️ Previous',
+        'next': 'Next ➡️',
+        'page': 'Page',
+        'of': 'of',
+        'manual_error': 'Error loading reader:',
+        'pdf_not_found': 'The file is not found on the server. Please ensure it is in the folder.'
     }
 }
 
@@ -451,7 +466,6 @@ else:
         activas = st.number_input(t('active_cals'), min_value=0.0, step=10.0)
         
     if st.button(t('calc_register_btn')):
-        # Conversión a métrico interno para cálculos clínicos exactos
         peso_kg = to_kg(peso_ui, sys)
         cuello_cm = to_cm(cuello_ui, sys)
         cintura_cm = to_cm(cintura_ui, sys)
@@ -471,7 +485,6 @@ else:
                 fila_a_actualizar = i + 2
                 break
                 
-        # Se guardan estrictamente valores métricos en la base de datos
         nueva_fila = [username_actual, fecha_registro, peso_kg, cuello_cm, cintura_cm, cadera_cm, ingesta, activas]
         
         if fila_a_actualizar:
@@ -531,7 +544,6 @@ else:
             ), axis=1
         ).round(1)
         
-        # Transformación de datos para el historial según el sistema elegido
         df_historial['Peso_disp'] = df_historial['Peso_kg'].apply(lambda x: from_kg(x, sys)).round(1)
         df_historial['Cuello_disp'] = df_historial['Cuello_cm'].apply(lambda x: from_cm(x, sys)).round(1)
         df_historial['Cintura_disp'] = df_historial['Cintura_cm'].apply(lambda x: from_cm(x, sys)).round(1)
@@ -591,3 +603,54 @@ else:
         
     else:
         st.info(t('empty_matrix'))
+
+    # --- LECTOR DE MANUAL INTEGRADO ---
+    st.markdown("---")
+    st.subheader(t('reader_title'))
+
+    # 1. Seleccionar el archivo correcto según el idioma elegido
+    if st.session_state.get('lang', 'ES') == 'EN':
+        ruta_manual = "manual_en.pdf"
+    else:
+        ruta_manual = "manual_es.pdf"
+
+    try:
+        # 2. Abrir el documento correspondiente
+        doc = fitz.open(ruta_manual)
+        total_paginas = len(doc)
+        
+        # 3. Controlar la página actual (Si cambia el idioma, reiniciar a la página 1)
+        if 'pagina_actual' not in st.session_state:
+            st.session_state['pagina_actual'] = 0
+            st.session_state['pdf_cargado'] = ruta_manual
+            
+        if st.session_state.get('pdf_cargado') != ruta_manual:
+            st.session_state['pagina_actual'] = 0
+            st.session_state['pdf_cargado'] = ruta_manual
+
+        # 4. Crear botones de navegación interactiva
+        col_nav1, col_nav2, col_nav3 = st.columns([1, 2, 1])
+        
+        with col_nav1:
+            if st.button(t('prev')) and st.session_state['pagina_actual'] > 0:
+                st.session_state['pagina_actual'] -= 1
+                st.rerun()
+                
+        with col_nav2:
+            st.markdown(f"<p style='text-align: center; font-weight: bold;'>{t('page')} {st.session_state['pagina_actual'] + 1} {t('of')} {total_paginas}</p>", unsafe_allow_html=True)
+            
+        with col_nav3:
+            if st.button(t('next')) and st.session_state['pagina_actual'] < total_paginas - 1:
+                st.session_state['pagina_actual'] += 1
+                st.rerun()
+
+        # 5. Extraer y mostrar la imagen de la página actual para proteger el contenido
+        pagina = doc.load_page(st.session_state['pagina_actual'])
+        imagen_pagina = pagina.get_pixmap(dpi=150)
+        
+        st.image(imagen_pagina.tobytes(), use_column_width=True)
+
+    except FileNotFoundError:
+        st.info(f"{t('pdf_not_found')} ('{ruta_manual}')")
+    except Exception as e:
+        st.error(f"{t('manual_error')} {e}")
