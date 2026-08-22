@@ -648,7 +648,7 @@ else:
         pagina = doc.load_page(st.session_state['pagina_actual'])
         imagen_pagina = pagina.get_pixmap(dpi=150)
         
-        st.image(imagen_pagina.tobytes(), use_column_width=True)
+        st.image(imagen_pagina.tobytes(), use_container_width=True)
 
     except FileNotFoundError:
         st.info(f"{t('pdf_not_found')} ('{ruta_manual}')")
