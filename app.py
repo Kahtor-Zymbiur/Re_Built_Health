@@ -7,6 +7,160 @@ import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 import json
 
+# --- DICCIONARIO DE TRADUCCIONES ---
+TEXTS = {
+    'ES': {
+        'title': 'RE/BUILT HEALTH',
+        'subtitle': 'Sistema de Cuantificación Metabólica',
+        'access': 'Acceso',
+        'login_menu': 'Iniciar Sesión',
+        'register_menu': 'Registrarse',
+        'username': 'Nombre de Usuario',
+        'password': 'Contraseña',
+        'enter_btn': 'Entrar',
+        'invalid_creds': 'Credenciales incorrectas.',
+        'create_account': 'Crea tu cuenta clínica',
+        'unique_code': 'Código de Acceso Único (Recibido por correo)',
+        'fullname': 'Nombre Completo',
+        'username_unique': 'Nombre de Usuario (Único)',
+        'biological_sex': 'Sexo Biológico',
+        'height': 'Estatura',
+        'birthdate': 'Fecha de Nacimiento',
+        'day': 'Día',
+        'month': 'Mes',
+        'year': 'Año',
+        'invalid_date': 'Fecha inválida',
+        'consent_title': '📄 Leer Consentimiento Informado',
+        'consent_text': 'Al utilizar esta plataforma, autorizas que tu información sea almacenada y utilizada de forma estrictamente anonimizada para investigaciones en el área de la salud.',
+        'consent_check': 'He leído y acepto el consentimiento informado.',
+        'create_btn': 'Crear Cuenta',
+        'consent_warn': 'Debes aceptar el consentimiento informado.',
+        'code_warn': 'Debes ingresar tu código.',
+        'user_in_use': 'Nombre de usuario en uso.',
+        'account_created': 'Cuenta creada. Inicia sesión.',
+        'welcome': 'Bienvenido',
+        'logout': 'Cerrar Sesión',
+        'panel_title': 'Panel Clínico de Control',
+        'data_history': '📋 Datos y antecedentes metabólicos',
+        'age': 'Edad',
+        'years': 'años',
+        'lean_mass': 'Masa Magra (Actual)',
+        'bmr': 'TMB (Actual)',
+        'daily_entry': '📝 Ingreso de Datos Diarios',
+        'record_date': 'Fecha del Registro',
+        'total_weight': 'Peso Total',
+        'neck': 'Cuello',
+        'waist': 'Cintura',
+        'hip': 'Cadera',
+        'not_required_m': 'No requerido (Biología H)',
+        'total_intake': 'Ingesta Total (kcal)',
+        'active_cals': 'Calorías Activas',
+        'calc_register_btn': 'Calcular y Registrar',
+        'daily_results': '### Resultados Metabólicos del Día',
+        'body_fat': 'Grasa Corporal (Naval)',
+        'dyn_tdee': 'TDEE Dinámico',
+        'reg_intake': 'Ingesta Registrada',
+        'daily_balance': 'Balance Diario',
+        'audit_history': 'Auditoría Histórica',
+        'trends': 'Tendencias',
+        'select_period': 'Seleccionar período de visualización:',
+        '7_days': '7 Días',
+        '1_month': '1 Mes',
+        '1_year': '1 Año',
+        'full_history': 'Historial Completo',
+        'weight_graph': '#### Peso',
+        'fat_graph': '#### Grasa (%)',
+        'no_data': 'Sin datos en este período',
+        'last_7_records': '#### Últimos 7 Registros',
+        'download_csv': '📥 Descargar Historial Completo (CSV)',
+        'empty_matrix': 'La matriz de datos está vacía. Comienza tu registro.',
+        'metric': 'Métrico (kg/cm)',
+        'imperial': 'Imperial (lbs/in)',
+        'lang_label': 'Idioma / Language',
+        'unit_label': 'Sistema de Medidas'
+    },
+    'EN': {
+        'title': 'RE/BUILT HEALTH',
+        'subtitle': 'Metabolic Quantification System',
+        'access': 'Access',
+        'login_menu': 'Login',
+        'register_menu': 'Register',
+        'username': 'Username',
+        'password': 'Password',
+        'enter_btn': 'Enter',
+        'invalid_creds': 'Invalid credentials.',
+        'create_account': 'Create your clinical account',
+        'unique_code': 'Unique Access Code (Received via email)',
+        'fullname': 'Full Name',
+        'username_unique': 'Username (Unique)',
+        'biological_sex': 'Biological Sex',
+        'height': 'Height',
+        'birthdate': 'Date of Birth',
+        'day': 'Day',
+        'month': 'Month',
+        'year': 'Year',
+        'invalid_date': 'Invalid date',
+        'consent_title': '📄 Read Informed Consent',
+        'consent_text': 'By using this platform, you authorize your information to be stored and used in a strictly anonymized manner for health research purposes.',
+        'consent_check': 'I have read and accept the informed consent.',
+        'create_btn': 'Create Account',
+        'consent_warn': 'You must accept the informed consent.',
+        'code_warn': 'You must enter your code.',
+        'user_in_use': 'Username is already in use.',
+        'account_created': 'Account created. Please log in.',
+        'welcome': 'Welcome',
+        'logout': 'Logout',
+        'panel_title': 'Clinical Control Panel',
+        'data_history': '📋 Metabolic Data & Background',
+        'age': 'Age',
+        'years': 'years',
+        'lean_mass': 'Lean Mass (Current)',
+        'bmr': 'BMR (Current)',
+        'daily_entry': '📝 Daily Data Entry',
+        'record_date': 'Record Date',
+        'total_weight': 'Total Weight',
+        'neck': 'Neck',
+        'waist': 'Waist',
+        'hip': 'Hips',
+        'not_required_m': 'Not required (M Biology)',
+        'total_intake': 'Total Intake (kcal)',
+        'active_cals': 'Active Calories',
+        'calc_register_btn': 'Calculate & Register',
+        'daily_results': '### Daily Metabolic Results',
+        'body_fat': 'Body Fat (Navy)',
+        'dyn_tdee': 'Dynamic TDEE',
+        'reg_intake': 'Registered Intake',
+        'daily_balance': 'Daily Balance',
+        'audit_history': 'Historical Audit',
+        'trends': 'Trends',
+        'select_period': 'Select visualization period:',
+        '7_days': '7 Days',
+        '1_month': '1 Month',
+        '1_year': '1 Year',
+        'full_history': 'Full History',
+        'weight_graph': '#### Weight',
+        'fat_graph': '#### Fat (%)',
+        'no_data': 'No data in this period',
+        'last_7_records': '#### Last 7 Records',
+        'download_csv': '📥 Download Full History (CSV)',
+        'empty_matrix': 'The data matrix is empty. Start your records.',
+        'metric': 'Metric (kg/cm)',
+        'imperial': 'Imperial (lbs/in)',
+        'lang_label': 'Language',
+        'unit_label': 'Measurement System'
+    }
+}
+
+def t(key):
+    lang = st.session_state.get('lang', 'ES')
+    return TEXTS[lang].get(key, key)
+
+# --- CONVERSORES DE UNIDADES ---
+def to_kg(val, unit_sys): return val * 0.453592 if unit_sys == 'Imperial (lbs/in)' else val
+def to_cm(val, unit_sys): return val * 2.54 if unit_sys == 'Imperial (lbs/in)' else val
+def from_kg(val, unit_sys): return val / 0.453592 if unit_sys == 'Imperial (lbs/in)' else val
+def from_cm(val, unit_sys): return val / 2.54 if unit_sys == 'Imperial (lbs/in)' else val
+
 # --- 1. CONFIGURACIÓN DE LA BASE DE DATOS ---
 @st.cache_resource
 def conectar_gsheets():
@@ -24,7 +178,6 @@ pestaña_usuarios = hoja_principal.worksheet("Usuarios")
 pestaña_registros = hoja_principal.worksheet("Registros")
 pestaña_codigos = hoja_principal.worksheet("Códigos")
 
-# --- LECTURA SEGURA: EXTRACCIÓN CRUDA ---
 def obtener_registros_seguro(pestaña):
     try:
         data = pestaña.get_all_values()
@@ -47,17 +200,16 @@ def verificar_y_quemar_codigo(codigo_ingresado):
             
             if estado == "Usado":
                 pestaña_codigos.update_cell(fila, 2, "Activado")
-                return True, "Código validado correctamente."
+                return True, "Código validado correctamente." if st.session_state.lang == 'ES' else "Code validated successfully."
             elif estado == "Activado":
-                return False, "Este código ya fue utilizado para crear una cuenta."
+                return False, "Este código ya fue utilizado." if st.session_state.lang == 'ES' else "This code was already used."
             elif estado == "Disponible":
-                return False, "Este código aún no ha sido autorizado por una compra."
+                return False, "Este código aún no ha sido autorizado." if st.session_state.lang == 'ES' else "Code not yet authorized."
             else:
-                return False, "El estado del código no es válido."
+                return False, "Estado inválido." if st.session_state.lang == 'ES' else "Invalid status."
     except gspread.exceptions.CellNotFound:
-        return False, "Código inválido o inexistente."
-    
-    return False, "Error desconocido."
+        return False, "Código inválido." if st.session_state.lang == 'ES' else "Invalid code."
+    return False, "Error desconocido." if st.session_state.lang == 'ES' else "Unknown error."
 
 def hash_password(password):
     return hashlib.sha256(str.encode(password)).hexdigest()
@@ -69,7 +221,6 @@ def verify_login(username, password):
     for user in usuarios:
         if str(user.get('username', '')) == username and str(user.get('password', '')) == hashed_pw:
             estatura_segura = float(str(user.get('estatura', '170')).replace(',', '.'))
-            # Busca fecha_nacimiento, si no existe toma 'edad' por retrocompatibilidad
             fecha_nac = user.get('fecha_nacimiento', user.get('edad', '1990-01-01'))
             return (user['username'], user['password'], user.get('nombre', ''), user.get('sexo', 'H'), estatura_segura, fecha_nac)
     return None
@@ -118,24 +269,43 @@ def calcular_katch_mcardle(peso, porcentaje_grasa):
 # --- 4. INTERFAZ DE USUARIO (UI) ---
 st.set_page_config(page_title="Re/Built Health", layout="centered")
 
-if 'logged_in' not in st.session_state:
-    st.session_state['logged_in'] = False
+# Inicializar estados
+if 'logged_in' not in st.session_state: st.session_state['logged_in'] = False
+if 'last_registered_user' not in st.session_state: st.session_state['last_registered_user'] = ""
+if 'lang' not in st.session_state: st.session_state['lang'] = 'ES'
+if 'unit_sys' not in st.session_state: st.session_state['unit_sys'] = 'Métrico (kg/cm)'
 
-if 'last_registered_user' not in st.session_state:
-    st.session_state['last_registered_user'] = ""
+# Controles globales en el sidebar
+st.sidebar.markdown(f"**{t('lang_label')}**")
+lang_sel = st.sidebar.radio("Idioma", ['ES', 'EN'], index=0 if st.session_state['lang'] == 'ES' else 1, label_visibility="collapsed")
+if lang_sel != st.session_state['lang']:
+    st.session_state['lang'] = lang_sel
+    st.rerun()
+
+st.sidebar.markdown(f"**{t('unit_label')}**")
+unit_opts = ['Métrico (kg/cm)', 'Imperial (lbs/in)']
+unit_idx = 0 if st.session_state['unit_sys'] == 'Métrico (kg/cm)' else 1
+unit_sel = st.sidebar.radio("Sistema", unit_opts, index=unit_idx, label_visibility="collapsed")
+if unit_sel != st.session_state['unit_sys']:
+    st.session_state['unit_sys'] = unit_sel
+    st.rerun()
+
+sys = st.session_state['unit_sys']
+w_unit = "kg" if sys == 'Métrico (kg/cm)' else "lbs"
+d_unit = "cm" if sys == 'Métrico (kg/cm)' else "in"
 
 if not st.session_state['logged_in']:
-    st.title("RE/BUILT HEALTH")
-    st.subheader("Sistema de Cuantificación Metabólica")
+    st.title(t('title'))
+    st.subheader(t('subtitle'))
     
-    menu = ["Iniciar Sesión", "Registrarse"]
-    choice = st.sidebar.selectbox("Acceso", menu)
+    menu_options = [t('login_menu'), t('register_menu')]
+    choice = st.sidebar.selectbox(t('access'), menu_options)
     
-    if choice == "Iniciar Sesión":
-        username = st.text_input("Nombre de Usuario", value=st.session_state['last_registered_user'], key="login_user")
-        password = st.text_input("Contraseña", value="", type="password", key="login_pass")
+    if choice == t('login_menu'):
+        username = st.text_input(t('username'), value=st.session_state['last_registered_user'], key="login_user")
+        password = st.text_input(t('password'), value="", type="password", key="login_pass")
         
-        if st.button("Entrar"):
+        if st.button(t('enter_btn')):
             user = verify_login(username, password)
             if user:
                 st.session_state['logged_in'] = True
@@ -146,75 +316,78 @@ if not st.session_state['logged_in']:
                 st.session_state['fecha_nacimiento'] = user[5]
                 st.rerun()
             else:
-                st.error("Credenciales incorrectas.")
+                st.error(t('invalid_creds'))
                 
-    elif choice == "Registrarse":
-        st.write("Crea tu cuenta clínica")
+    elif choice == t('register_menu'):
+        st.write(t('create_account'))
         
-        new_codigo = st.text_input("Código de Acceso Único (Recibido por correo)", key="reg_codigo")
-        new_nombre = st.text_input("Nombre Completo", key="reg_nombre")
-        new_username = st.text_input("Nombre de Usuario (Único)", key="reg_user")
-        new_password = st.text_input("Contraseña", value="", type="password", key="reg_pass")
+        new_codigo = st.text_input(t('unique_code'), key="reg_codigo")
+        new_nombre = st.text_input(t('fullname'), key="reg_nombre")
+        new_username = st.text_input(t('username_unique'), key="reg_user")
+        new_password = st.text_input(t('password'), value="", type="password", key="reg_pass")
         
         col1, col2, col3 = st.columns(3)
         with col1:
-            new_sexo = st.selectbox("Sexo Biológico", ["H", "M"], key="reg_sexo")
+            sex_options = ["H", "M"]
+            new_sexo = st.selectbox(t('biological_sex'), sex_options, key="reg_sexo")
         with col2:
-            new_estatura = st.number_input("Estatura (cm)", min_value=100.0, max_value=250.0, step=0.1, key="reg_estatura")
+            min_h, max_h, def_h = (100.0, 250.0, 170.0) if sys == 'Métrico (kg/cm)' else (39.0, 98.0, 67.0)
+            new_estatura_ui = st.number_input(f"{t('height')} ({d_unit})", min_value=min_h, max_value=max_h, value=def_h, step=0.1, key="reg_estatura")
+            new_estatura_cm = to_cm(new_estatura_ui, sys)
+            
         with col3:
-            st.markdown("<span style='font-size: 14px;'>Fecha de Nacimiento</span>", unsafe_allow_html=True)
+            st.markdown(f"<span style='font-size: 14px;'>{t('birthdate')}</span>", unsafe_allow_html=True)
             c_dia, c_mes, c_ano = st.columns(3)
             with c_dia:
-                dia = st.selectbox("Día", list(range(1, 32)), key="reg_dia")
+                dia = st.selectbox(t('day'), list(range(1, 32)), key="reg_dia")
             with c_mes:
-                mes = st.selectbox("Mes", list(range(1, 13)), key="reg_mes")
+                mes = st.selectbox(t('month'), list(range(1, 13)), key="reg_mes")
             with c_ano:
-                # Lista desde el año actual hacia atrás. Index 36 selecciona 1990 por defecto (2026 - 36).
-                ano = st.selectbox("Año", list(range(datetime.now().year, 1919, -1)), index=36, key="reg_ano")
+                ano = st.selectbox(t('year'), list(range(datetime.now().year, 1919, -1)), index=36, key="reg_ano")
             
             try:
                 new_fecha_nac = date(ano, mes, dia)
             except ValueError:
-                st.error("Fecha inválida (ej. 31 de febrero)")
-                new_fecha_nac = date(1990, 1, 1) # Valor de respaldo
+                st.error(t('invalid_date'))
+                new_fecha_nac = date(1990, 1, 1)
             
         st.markdown("---")
         
-        with st.expander("📄 Leer Consentimiento Informado"):
-            st.markdown("Al utilizar esta plataforma, autorizas que tu información sea almacenada y utilizada de forma estrictamente anonimizada para investigaciones en el área de la salud.")
+        with st.expander(t('consent_title')):
+            st.markdown(t('consent_text'))
 
-        consentimiento = st.checkbox("He leído y acepto el consentimiento informado.", key="reg_consent")
+        consentimiento = st.checkbox(t('consent_check'), key="reg_consent")
         st.markdown("---")
             
-        if st.button("Crear Cuenta"):
+        if st.button(t('create_btn')):
             if not consentimiento:
-                st.warning("Debes aceptar el consentimiento informado.")
+                st.warning(t('consent_warn'))
             elif not new_codigo:
-                st.warning("Debes ingresar tu código.")
+                st.warning(t('code_warn'))
             else:
                 usuarios_existentes = [str(u.get('username', '')) for u in obtener_registros_seguro(pestaña_usuarios)]
                 if new_username in usuarios_existentes:
-                    st.error("Nombre de usuario en uso.")
+                    st.error(t('user_in_use'))
                 else:
                     es_valido, msj_codigo = verificar_y_quemar_codigo(new_codigo)
                     if es_valido:
-                        register_user(new_username, new_password, new_nombre, new_sexo, new_estatura, new_fecha_nac)
-                        st.success("Cuenta creada. Inicia sesión.")
+                        register_user(new_username, new_password, new_nombre, new_sexo, new_estatura_cm, new_fecha_nac)
+                        st.success(t('account_created'))
                         st.session_state['last_registered_user'] = new_username
                     else:
                         st.error(msj_codigo)
 
 else:
-    st.sidebar.title(f"Bienvenido, {st.session_state.get('nombre', '')}")
-    if st.sidebar.button("Cerrar Sesión"):
+    st.sidebar.title(f"{t('welcome')}, {st.session_state.get('nombre', '')}")
+    if st.sidebar.button(t('logout')):
         st.session_state['logged_in'] = False
         st.rerun()
         
-    st.title("Panel Clínico de Control")
+    st.title(t('panel_title'))
     
     # --- CÁLCULO DE DATOS PARA EL PANEL ---
     todos_los_registros = obtener_registros_seguro(pestaña_registros)
-    datos_usuario = [r for r in todos_los_registros if str(r.get('username', '')).strip() == st.session_state.get('username', '')]
+    datos_usuario = [r for r in todos_los_registros if str(r.get('username', '')) == st.session_state.get('username', '')]
     
     edad_actual = calcular_edad(st.session_state.get('fecha_nacimiento', '1990-01-01'))
     lbm_actual = 0.0
@@ -235,44 +408,57 @@ else:
         lbm_actual, tmb_actual = calcular_katch_mcardle(ultimo_peso, ultima_grasa)
 
     # --- RENDERIZADO DEL PANEL CLÍNICO ---
-    st.subheader("📋 Datos y antecedentes metabólicos")
+    st.subheader(t('data_history'))
     col_p1, col_p2, col_p3, col_p4 = st.columns(4)
     with col_p1:
-        st.metric(label="Edad", value=f"{edad_actual} años")
+        st.metric(label=t('age'), value=f"{edad_actual} {t('years')}")
     with col_p2:
-        st.metric(label="Altura", value=f"{st.session_state.get('estatura', 0)} cm")
+        val_estatura = from_cm(st.session_state.get('estatura', 0), sys)
+        st.metric(label=t('height'), value=f"{val_estatura:.1f} {d_unit}")
     with col_p3:
-        st.metric(label="Masa Magra (Actual)", value=f"{lbm_actual:.1f} kg")
+        val_lbm = from_kg(lbm_actual, sys)
+        st.metric(label=t('lean_mass'), value=f"{val_lbm:.1f} {w_unit}")
     with col_p4:
-        st.metric(label="TMB (Actual)", value=f"{tmb_actual:.0f} kcal")
+        st.metric(label=t('bmr'), value=f"{tmb_actual:.0f} kcal")
         
     st.markdown("---")
     
     # --- FORMULARIO DE INGRESO DIARIO ---
-    st.subheader("📝 Ingreso de Datos Diarios")
-    
-    fecha_ingreso = st.date_input("Fecha del Registro", value=datetime.now().date())
+    st.subheader(t('daily_entry'))
+    fecha_ingreso = st.date_input(t('record_date'), value=datetime.now().date())
     
     col1, col2 = st.columns(2)
     
     with col1:
-        peso = st.number_input("Peso Total (kg)", min_value=30.0, max_value=200.0, value=70.0, step=0.1)
-        cuello = st.number_input("Cuello (cm)", min_value=20.0, max_value=60.0, value=38.0, step=0.1)
-        cintura = st.number_input("Cintura (cm)", min_value=40.0, max_value=150.0, value=80.0, step=0.1)
+        min_w, max_w, def_w = (30.0, 200.0, 70.0) if sys == 'Métrico (kg/cm)' else (66.0, 440.0, 154.0)
+        peso_ui = st.number_input(f"{t('total_weight')} ({w_unit})", min_value=min_w, max_value=max_w, value=def_w, step=0.1)
+        
+        min_n, max_n, def_n = (20.0, 60.0, 38.0) if sys == 'Métrico (kg/cm)' else (8.0, 24.0, 15.0)
+        cuello_ui = st.number_input(f"{t('neck')} ({d_unit})", min_value=min_n, max_value=max_n, value=def_n, step=0.1)
+        
+        min_c, max_c, def_c = (40.0, 150.0, 80.0) if sys == 'Métrico (kg/cm)' else (16.0, 60.0, 31.5)
+        cintura_ui = st.number_input(f"{t('waist')} ({d_unit})", min_value=min_c, max_value=max_c, value=def_c, step=0.1)
         
     with col2:
-        cadera = 0.0
+        cadera_ui = 0.0
         if st.session_state.get('sexo', 'H') == 'M':
-            cadera = st.number_input("Cadera (cm)", min_value=50.0, max_value=150.0, step=0.1)
+            min_hip, max_hip = (50.0, 150.0) if sys == 'Métrico (kg/cm)' else (20.0, 60.0)
+            cadera_ui = st.number_input(f"{t('hip')} ({d_unit})", min_value=min_hip, max_value=max_hip, step=0.1)
         else:
-            st.text_input("Cadera (cm)", value="No requerido (Biología H)", disabled=True)
+            st.text_input(f"{t('hip')} ({d_unit})", value=t('not_required_m'), disabled=True)
             
-        ingesta = st.number_input("Ingesta Total (kcal)", min_value=0.0, step=10.0)
-        activas = st.number_input("Calorías Activas", min_value=0.0, step=10.0)
+        ingesta = st.number_input(t('total_intake'), min_value=0.0, step=10.0)
+        activas = st.number_input(t('active_cals'), min_value=0.0, step=10.0)
         
-    if st.button("Calcular y Registrar"):
-        grasa = calcular_grasa_naval(st.session_state['sexo'], st.session_state['estatura'], cuello, cintura, cadera)
-        lbm, tmb = calcular_katch_mcardle(peso, grasa)
+    if st.button(t('calc_register_btn')):
+        # Conversión a métrico interno para cálculos clínicos exactos
+        peso_kg = to_kg(peso_ui, sys)
+        cuello_cm = to_cm(cuello_ui, sys)
+        cintura_cm = to_cm(cintura_ui, sys)
+        cadera_cm = to_cm(cadera_ui, sys)
+        
+        grasa = calcular_grasa_naval(st.session_state['sexo'], st.session_state['estatura'], cuello_cm, cintura_cm, cadera_cm)
+        lbm, tmb = calcular_katch_mcardle(peso_kg, grasa)
         tdee = tmb + activas
         balance = ingesta - tdee
         
@@ -285,7 +471,8 @@ else:
                 fila_a_actualizar = i + 2
                 break
                 
-        nueva_fila = [username_actual, fecha_registro, peso, cuello, cintura, cadera, ingesta, activas]
+        # Se guardan estrictamente valores métricos en la base de datos
+        nueva_fila = [username_actual, fecha_registro, peso_kg, cuello_cm, cintura_cm, cadera_cm, ingesta, activas]
         
         if fila_a_actualizar:
             rango = f"A{fila_a_actualizar}:H{fila_a_actualizar}"
@@ -293,20 +480,21 @@ else:
         else:
             pestaña_registros.append_row(nueva_fila)
         
-        st.markdown("### Resultados Metabólicos del Día")
+        st.markdown(t('daily_results'))
         met1, met2, met3 = st.columns(3)
-        met1.metric(label="Grasa Corporal (Naval)", value=f"{grasa:.1f} %")
-        met2.metric(label="Masa Magra (LBM)", value=f"{lbm:.1f} kg")
-        met3.metric(label="TMB (Katch-McArdle)", value=f"{tmb:.0f} kcal")
+        met1.metric(label=t('body_fat'), value=f"{grasa:.1f} %")
+        val_lbm_disp = from_kg(lbm, sys)
+        met2.metric(label=t('lean_mass'), value=f"{val_lbm_disp:.1f} {w_unit}")
+        met3.metric(label="TMB", value=f"{tmb:.0f} kcal")
         
         met4, met5, met6 = st.columns(3)
-        met4.metric(label="TDEE Dinámico", value=f"{tdee:.0f} kcal")
-        met5.metric(label="Ingesta Registrada", value=f"{ingesta:.0f} kcal")
-        met6.metric(label="Balance Diario", value=f"{balance:.0f} kcal", delta=f"{balance:.0f} kcal", delta_color="inverse")
+        met4.metric(label=t('dyn_tdee'), value=f"{tdee:.0f} kcal")
+        met5.metric(label=t('reg_intake'), value=f"{ingesta:.0f} kcal")
+        met6.metric(label=t('daily_balance'), value=f"{balance:.0f} kcal", delta=f"{balance:.0f} kcal", delta_color="inverse")
 
     # --- HISTORIAL Y TENDENCIAS ---
     st.markdown("---")
-    st.subheader("Auditoría Histórica")
+    st.subheader(t('audit_history'))
     
     df_historial = pd.DataFrame(datos_usuario)
     
@@ -343,53 +531,63 @@ else:
             ), axis=1
         ).round(1)
         
-        columnas_visibles = ['Fecha', 'Peso_kg', '% Grasa', 'Cuello_cm', 'Cintura_cm', 'Cadera_cm', 'Ingesta', 'Gasto_Activo']
+        # Transformación de datos para el historial según el sistema elegido
+        df_historial['Peso_disp'] = df_historial['Peso_kg'].apply(lambda x: from_kg(x, sys)).round(1)
+        df_historial['Cuello_disp'] = df_historial['Cuello_cm'].apply(lambda x: from_cm(x, sys)).round(1)
+        df_historial['Cintura_disp'] = df_historial['Cintura_cm'].apply(lambda x: from_cm(x, sys)).round(1)
+        df_historial['Cadera_disp'] = df_historial['Cadera_cm'].apply(lambda x: from_cm(x, sys)).round(1)
+        
+        df_historial = df_historial.rename(columns={
+            'Peso_disp': f'Peso ({w_unit})',
+            'Cuello_disp': f'Cuello ({d_unit})',
+            'Cintura_disp': f'Cintura ({d_unit})',
+            'Cadera_disp': f'Cadera ({d_unit})'
+        })
+        
+        columnas_visibles = ['Fecha', f'Peso ({w_unit})', '% Grasa', f'Cuello ({d_unit})', f'Cintura ({d_unit})', f'Cadera ({d_unit})', 'Ingesta', 'Gasto_Activo']
         columnas_existentes = [c for c in columnas_visibles if c in df_historial.columns]
         df_mostrar = df_historial[columnas_existentes]
         
-        st.markdown("#### Tendencias")
-        filtro = st.radio(
-            "Seleccionar período de visualización:", 
-            ["7 Días", "1 Mes", "1 Año", "Historial Completo"], 
-            horizontal=True
-        )
+        st.markdown(t('trends'))
+        opciones_filtro = [t('7_days'), t('1_month'), t('1_year'), t('full_history')]
+        filtro = st.radio(t('select_period'), opciones_filtro, horizontal=True)
 
         fecha_actual = pd.to_datetime(datetime.now().date())
-        if filtro == "7 Días":
+        if filtro == t('7_days'):
             df_grafico = df_historial[df_historial['Fecha_dt'] >= (fecha_actual - pd.Timedelta(days=7))]
-        elif filtro == "1 Mes":
+        elif filtro == t('1_month'):
             df_grafico = df_historial[df_historial['Fecha_dt'] >= (fecha_actual - pd.Timedelta(days=30))]
-        elif filtro == "1 Año":
+        elif filtro == t('1_year'):
             df_grafico = df_historial[df_historial['Fecha_dt'] >= (fecha_actual - pd.Timedelta(days=365))]
         else:
             df_grafico = df_historial
 
         col_graf1, col_graf2 = st.columns(2)
         with col_graf1:
-            st.markdown("#### Peso (kg)")
-            if 'Peso_kg' in df_grafico.columns and not df_grafico.empty:
-                st.line_chart(df_grafico.set_index('Fecha')['Peso_kg'], color="#2563EB")
+            st.markdown(f"{t('weight_graph')} ({w_unit})")
+            if f'Peso ({w_unit})' in df_grafico.columns and not df_grafico.empty:
+                st.line_chart(df_grafico.set_index('Fecha')[f'Peso ({w_unit})'], color="#2563EB")
             else:
-                st.info("Sin datos en este período")
+                st.info(t('no_data'))
                 
         with col_graf2:
-            st.markdown("#### Grasa (%)")
+            st.markdown(t('fat_graph'))
             if '% Grasa' in df_grafico.columns and not df_grafico.empty:
                 st.line_chart(df_grafico.set_index('Fecha')['% Grasa'], color="#10B981")
             else:
-                st.info("Sin datos en este período")
+                st.info(t('no_data'))
                 
-        st.markdown("#### Últimos 7 Registros")
+        st.markdown(t('last_7_records'))
         df_ultimos_7 = df_mostrar.tail(7)
         st.dataframe(df_ultimos_7, use_container_width=True)
         
         csv_data = df_mostrar.to_csv(index=False).encode('utf-8')
         st.download_button(
-            label="📥 Descargar Historial Completo (CSV)",
+            label=t('download_csv'),
             data=csv_data,
-            file_name=f"Rebuilt_Historial_{st.session_state['username']}.csv",
+            file_name=f"Rebuilt_Historial_{st.session_state.get('username', 'usuario')}.csv",
             mime="text/csv"
         )
         
     else:
-        st.info("La matriz de datos está vacía. Comienza tu registro.")
+        st.info(t('empty_matrix'))
